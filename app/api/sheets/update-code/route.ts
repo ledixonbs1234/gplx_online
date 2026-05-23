@@ -80,6 +80,7 @@ export async function POST(request: Request) {
           tracking_number: excelCode || updatedCandidates[matchIndex].tracking_number,
           has_postal_up: true,
           exam_status: 'Pass' as const,
+          gplx_status: 'Returned' as const, 
           has_app_and_fee: true,
           has_profile: true,
         };
