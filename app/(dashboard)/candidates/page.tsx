@@ -195,7 +195,7 @@ export default function CandidatesPage() {
                   {sheetsList.map((sheet) => (
                     <Badge
                       key={sheet}
-                      variant={format(selectedDate, 'yyyy-MM-dd') === sheet ? 'default' : 'secondary'}
+                      variant={selectedDate && format(selectedDate, 'yyyy-MM-dd') === sheet ? 'default' : 'secondary'}
                       className="cursor-pointer"
                       onClick={() => setSelectedDate(new Date(sheet))}
                     >
