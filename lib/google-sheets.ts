@@ -87,11 +87,11 @@ export async function getAllSheetNames(): Promise<string[]> {
   const allSheets = response.data.sheets?.map((sheet: any) => sheet.properties.title) || [];
   
   // Lọc chỉ lấy các sheet có tên là ngày hợp lệ (dd-MM-yyyy hoặc yyyy-MM-dd)
-  const validDateSheets = allSheets.filter(name => isValidDateSheetName(name));
+  const validDateSheets = allSheets.filter((name: string) => isValidDateSheetName(name));
   
   console.log(`📋 Tổng số sheet: ${allSheets.length}, Sheet có cấu trúc ngày hợp lệ: ${validDateSheets.length}`);
   if (allSheets.length !== validDateSheets.length) {
-    const invalidSheets = allSheets.filter(name => !isValidDateSheetName(name));
+    const invalidSheets = allSheets.filter((name: string) => !isValidDateSheetName(name));
     console.log(`⚠️ Các sheet bị loại trừ (không có cấu trúc ngày):`, invalidSheets);
   }
   
