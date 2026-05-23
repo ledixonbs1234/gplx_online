@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   GraduationCap,
   LogOut,
+  QrCode,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ const menuItems = [
     items: [
       { label: 'Ngày thi', href: '/exam-days', icon: Calendar },
       { label: 'Học viên', href: '/candidates', icon: Users },
+      { label: 'Quét mã hiệu', href: '/scanner', icon: QrCode },
       { label: 'Upload dữ liệu', href: '/upload', icon: Upload },
       { label: 'Google Sheets', href: '/sheets', icon: FileSpreadsheet },
     ],
@@ -193,6 +195,7 @@ function MobileBottomNav() {
     { label: 'Thống kê', href: '/analytics', icon: BarChart3 },
     { label: 'Upload', href: '/upload', icon: Upload },
     { label: 'Học viên', href: '/candidates', icon: Users },
+    { label: 'Quét mã', href: '/scanner', icon: QrCode },
   ];
 
   return (
