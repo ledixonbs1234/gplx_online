@@ -175,6 +175,47 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
   });
 }
 
+/**
+ * Cập nhật danh sách thí sinh vào sheet (ghi đè toàn bộ dữ liệu)
+ */
+export async function updateCandidatesInSheet(sheetName: string, candidates: Candidate[]): Promise<void> {
+  const sheets = getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+  // Xóa dữ liệu cũ (từ dòng 2 trở đi)
+  const lastRow = candidates.length + 1;
+  
+  // Chuẩn bị dữ liệu mới
+  const values = candidates.map((c) => [
+    c.sbd,
+    c.name,
+    c.date_of_birth || '',
+    c.phone || '',
+    c.receive_location || '',
+    c.tracking_number || '',
+    c.has_profile ? 'Có' : 'Không',
+    c.exam_status === 'Pass' ? 'Đậu' : c.exam_status === 'Fail' ? 'Rớt' : 'Chưa thi',
+    c.has_app_and_fee ? 'Có' : 'Không',
+    c.gplx_status === 'Returned' ? 'Đã về' : 'Chờ',
+    c.has_postal_up ? 'Có' : 'Không',
+  ]);
+
+  // Xóa dữ liệu cũ và ghi mới
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId,
+    range: `'${sheetName}'!A2:K1000`,
+  });
+
+  if (values.length > 0) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${sheetName}'!A2:K${lastRow}`,
+      valueInputOption: 'RAW',
+      requestBody: { values },
+    });
+  }
+}
+
 // Helper functions
 function getCellValue(row: any[], headers: string[], possibleNames: string[]): string {
   for (const name of possibleNames) {
