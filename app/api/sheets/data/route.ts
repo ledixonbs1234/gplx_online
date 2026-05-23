@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readSheet, getAllSheetNames } from '@/lib/google-sheets';
+import { readSheet, getAllSheetNames, findSheetNameWithFallback } from '@/lib/google-sheets';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,9 +15,11 @@ export async function GET(request: Request) {
       );
     }
 
-    // Kiểm tra sheet có tồn tại không
+    // Tự động tìm kiếm tên sheet phù hợp thông qua cơ chế Fallback
+    const resolvedSheetName = await findSheetNameWithFallback(date);
     const existingSheets = await getAllSheetNames();
-    if (!existingSheets.includes(date)) {
+    
+    if (!existingSheets.includes(resolvedSheetName)) {
       return NextResponse.json(
         { 
           success: true, 
@@ -27,8 +29,8 @@ export async function GET(request: Request) {
       );
     }
 
-    // Đọc dữ liệu từ sheet
-    const candidates = await readSheet(date);
+    // Đọc dữ liệu từ sheet thực tế đã được dò tìm thấy
+    const candidates = await readSheet(resolvedSheetName);
 
     return NextResponse.json({
       success: true,

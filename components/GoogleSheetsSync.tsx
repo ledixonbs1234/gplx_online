@@ -18,6 +18,7 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false); // State quản lý việc đóng mở Popover
   const [status, setStatus] = useState<{
     type: 'success' | 'error' | null;
     message: string;
@@ -120,7 +121,7 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
           </Button>
 
           <div className="flex gap-2 items-center">
-            <Popover>
+            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -133,12 +134,17 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
                   {selectedDate ? format(selectedDate, 'dd-MM-yyyy') : <span>Chọn ngày</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
+              <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={(date) => date && setSelectedDate(date)}
-                  initialFocus
+                  onSelect={(date) => {
+                    if (date) {
+                      setSelectedDate(date);
+                      setIsCalendarOpen(false); // Tự động đóng popover khi chọn ngày
+                    }
+                  }}
+                  autoFocus // Đã thay thế initialFocus bằng autoFocus để tương thích v10
                 />
               </PopoverContent>
             </Popover>

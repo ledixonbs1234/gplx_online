@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server';
-import { createNewSheet, getAllSheetNames } from '@/lib/google-sheets';
+import { createNewSheet, getAllSheetNames, findSheetNameWithFallback } from '@/lib/google-sheets';
 import { format } from 'date-fns';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const sheetName = body.sheetName || format(new Date(), 'yyyy-MM-dd');
+    const sheetName = body.sheetName || format(new Date(), 'dd-MM-yyyy'); // Mặc định chuyển sang dd-MM-yyyy
 
-    // Kiểm tra sheet đã tồn tại chưa
+    // Kiểm tra sheet đã tồn tại chưa (Sử dụng cơ chế Fallback để check chéo định dạng)
+    const resolvedName = await findSheetNameWithFallback(sheetName);
     const existingSheets = await getAllSheetNames();
-    if (existingSheets.includes(sheetName)) {
+    if (existingSheets.includes(resolvedName)) {
       return NextResponse.json(
-        { success: false, error: `Sheet "${sheetName}" đã tồn tại` },
+        { success: false, error: `Sheet "${resolvedName}" đã tồn tại` },
         { status: 400 }
       );
     }

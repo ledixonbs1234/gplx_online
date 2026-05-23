@@ -39,6 +39,7 @@ const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag
 
 export default function CandidatesPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sheetsList, setSheetsList] = useState<string[]>([]);
@@ -46,6 +47,21 @@ export default function CandidatesPage() {
   const [isUpdatingCode, setIsUpdatingCode] = useState(false);
   const [updateResult, setUpdateResult] = useState<{ success: boolean; message: string; updatedCount?: number; notFoundCount?: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper chuyển đổi định dạng chuỗi ngày (dd-MM-yyyy hoặc yyyy-MM-dd) sang Object Date
+  const parseSheetDate = (sheetName: string): Date => {
+    const parts = sheetName.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // yyyy-MM-dd
+        return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      } else {
+        // dd-MM-yyyy
+        return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      }
+    }
+    return new Date(sheetName);
+  };
 
   // Load danh sách sheets khi mount
   useEffect(() => {
@@ -63,14 +79,14 @@ export default function CandidatesPage() {
     loadSheets();
   }, []);
 
-  // Load dữ liệu học viên theo ngày thi
+  // Load dữ liệu học viên theo ngày thi (sử dụng dd-MM-yyyy)
   useEffect(() => {
     const loadCandidates = async () => {
       if (!selectedDate) return;
       
       setIsLoading(true);
       try {
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const dateStr = format(selectedDate, 'dd-MM-yyyy'); // Sử dụng chuẩn dd-MM-yyyy
         const response = await fetch(`/api/sheets/data?date=${dateStr}`);
         const result = await response.json();
         if (result.success) {
@@ -142,7 +158,6 @@ export default function CandidatesPage() {
         if (!colHContent) continue;
         
         // Parse nội dung cột H: "1 TRẦN VĂN AN 01/02/1980"
-        // Số báo danh là số đầu tiên
         const parts = colHContent.split(/\s+/);
         const sbd = parts[0] || '';
         
@@ -169,8 +184,8 @@ export default function CandidatesPage() {
         return;
       }
 
-      // Gọi API để cập nhật
-      const examDate = format(selectedDate, 'yyyy-MM-dd');
+      // Gọi API để cập nhật (Sử dụng chuẩn dd-MM-yyyy)
+      const examDate = format(selectedDate, 'dd-MM-yyyy');
       const response = await fetch('/api/sheets/update-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -237,18 +252,21 @@ export default function CandidatesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Popover>
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {selectedDate ? format(selectedDate, 'PPP', { locale: vi }) : 'Chọn ngày'}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
                     selected={selectedDate}
-                    onSelect={setSelectedDate}
+                    onSelect={(date) => {
+                      setSelectedDate(date);
+                      setIsCalendarOpen(false);
+                    }}
                     locale={vi}
                   />
                 </PopoverContent>
@@ -385,9 +403,15 @@ export default function CandidatesPage() {
                   {sheetsList.map((sheet) => (
                     <Badge
                       key={sheet}
-                      variant={selectedDate && format(selectedDate, 'yyyy-MM-dd') === sheet ? 'default' : 'secondary'}
+                      variant={
+                        selectedDate &&
+                        (format(selectedDate, 'dd-MM-yyyy') === sheet ||
+                          format(selectedDate, 'yyyy-MM-dd') === sheet)
+                          ? 'default'
+                          : 'secondary'
+                      }
                       className="cursor-pointer"
-                      onClick={() => setSelectedDate(new Date(sheet))}
+                      onClick={() => setSelectedDate(parseSheetDate(sheet))}
                     >
                       📅 {sheet}
                     </Badge>

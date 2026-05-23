@@ -48,15 +48,51 @@ export async function getAllSheetNames(): Promise<string[]> {
 }
 
 /**
+ * Tìm tên sheet thực tế hỗ trợ chuyển đổi linh hoạt giữa dd-MM-yyyy và yyyy-MM-dd
+ */
+export async function findSheetNameWithFallback(requestedName: string): Promise<string> {
+  try {
+    const existingSheets = await getAllSheetNames();
+    if (existingSheets.includes(requestedName)) {
+      return requestedName;
+    }
+
+    // Thử đảo định dạng ngày nếu chứa dấu gạch ngang
+    const parts = requestedName.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // yyyy-MM-dd -> Thử tìm: dd-MM-yyyy
+        const altName = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        if (existingSheets.includes(altName)) {
+          return altName;
+        }
+      } else if (parts[2].length === 4) {
+        // dd-MM-yyyy -> Thử tìm: yyyy-MM-dd
+        const altName = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        if (existingSheets.includes(altName)) {
+          return altName;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error finding sheet fallback name:', error);
+  }
+  return requestedName;
+}
+
+/**
  * Đọc dữ liệu từ một sheet cụ thể
  */
 export async function readSheet(sheetName: string): Promise<Candidate[]> {
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
+  // Tự động tìm tên sheet chính xác trong Google Sheets
+  const actualSheetName = await findSheetNameWithFallback(sheetName);
+
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `'${sheetName}'!A1:Z1000`,
+    range: `'${actualSheetName}'!A1:Z1000`,
   });
 
   const rows = response.data.values;
@@ -73,7 +109,7 @@ export async function readSheet(sheetName: string): Promise<Candidate[]> {
     phone: getCellValue(row, headers, ['số điện thoại', 'so dien thoai', 'phone', 'điện thoại', 'dien thoai']) || undefined,
     receive_location: getCellValue(row, headers, ['nơi nhận', 'noi nhan', 'receive_location']) || undefined,
     tracking_number: getCellValue(row, headers, ['mã vận đơn', 'ma van don', 'tracking_number', 'tracking']) || undefined,
-    exam_date: sheetName,
+    exam_date: actualSheetName,
     has_profile: parseBool(getCellValue(row, headers, ['có hồ sơ', 'co ho so', 'has_profile'])),
     exam_status: parseExamStatus(getCellValue(row, headers, ['kết quả thi', 'ket qua thi', 'exam_status'])),
     has_app_and_fee: parseBool(getCellValue(row, headers, ['đã nộp tiền', 'da nop tien', 'đk app + tiền', 'dk app', 'has_app_and_fee'])),
@@ -153,6 +189,8 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
+  const actualSheetName = await findSheetNameWithFallback(sheetName);
+
   const values = candidates.map((c) => [
     c.sbd,
     c.name,
@@ -169,7 +207,7 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${sheetName}'!A2:K${values.length + 1}`,
+    range: `'${actualSheetName}'!A2:K${values.length + 1}`,
     valueInputOption: 'RAW',
     requestBody: { values },
   });
@@ -182,7 +220,7 @@ export async function updateCandidatesInSheet(sheetName: string, candidates: Can
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
-  // Xóa dữ liệu cũ (từ dòng 2 trở đi)
+  const actualSheetName = await findSheetNameWithFallback(sheetName);
   const lastRow = candidates.length + 1;
   
   // Chuẩn bị dữ liệu mới
@@ -203,13 +241,13 @@ export async function updateCandidatesInSheet(sheetName: string, candidates: Can
   // Xóa dữ liệu cũ và ghi mới
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `'${sheetName}'!A2:K1000`,
+    range: `'${actualSheetName}'!A2:K1000`,
   });
 
   if (values.length > 0) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `'${sheetName}'!A2:K${lastRow}`,
+      range: `'${actualSheetName}'!A2:K${lastRow}`,
       valueInputOption: 'RAW',
       requestBody: { values },
     });
