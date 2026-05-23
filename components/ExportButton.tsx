@@ -25,12 +25,12 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
       ['Rớt', '', report.fail_count],
       ['Thi đậu', '', report.pass_count],
       [],
-      ['NHÓM CÓ ĐĂNG KÝ APP + TIỀN', '', 'SỐ LƯỢNG'],
+      ['NHÓM ĐÃ NỘP TIỀN', '', 'SỐ LƯỢNG'],
       ['Tổng số', '', report.with_app_and_fee.total],
       ['GPLX về + up postal', '', report.with_app_and_fee.returned_with_postal],
       ['GPLX chưa về', '', report.with_app_and_fee.pending],
       [],
-      ['NHÓM KHÔNG NỘP TIỀN', '', 'SỐ LƯỢNG'],
+      ['NHÓM CHƯA NỘP TIỀN', '', 'SỐ LƯỢNG'],
       ['Tổng số', '', report.without_fee.total],
       ['GPLX về', '', report.without_fee.returned],
       ['GPLX chưa về', '', report.without_fee.pending],
@@ -52,14 +52,14 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
 
     // Sheet 2: Danh sách chi tiết
     const detailData = [
-      ['ID', 'Họ tên', 'Ngày thi', 'Có hồ sơ', 'Kết quả', 'App + Tiền', 'GPLX', 'Up postal'],
+      ['ID', 'Họ tên', 'Ngày thi', 'Có hồ sơ', 'Kết quả', 'Đã Nộp Tiền', 'GPLX', 'Up postal'],
       ...candidates.map((c) => [
         c.id,
         c.name,
         c.exam_date,
         c.has_profile ? 'Có' : 'Không',
         c.exam_status,
-        c.has_app_and_fee ? 'Có' : 'Không',
+        c.has_app_and_fee ? 'Đã Nộp' : 'Chưa Nộp',
         c.gplx_status,
         c.has_postal_up ? 'Có' : 'Không',
       ]),
@@ -90,7 +90,7 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
         c.id,
         c.name,
         c.exam_date,
-        c.has_app_and_fee ? 'Có App + Tiền' : 'Không nộp tiền',
+        c.has_app_and_fee ? 'Đã Nộp Tiền' : 'Chưa Nộp Tiền',
         'Cần theo dõi GPLX',
       ]),
     ];

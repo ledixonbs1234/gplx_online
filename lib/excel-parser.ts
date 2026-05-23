@@ -15,7 +15,7 @@ export function parseExcelFile(fileBuffer: Buffer): Map<string, Candidate[]> {
       exam_date: sheetName,
       has_profile: parseBoolean(row['Có hồ sơ'] || row['has_profile']),
       exam_status: parseExamStatus(row['Kết quả thi'] || row['exam_status']),
-      has_app_and_fee: parseBoolean(row['ĐK app + tiền'] || row['has_app_and_fee']),
+      has_app_and_fee: parseBoolean(row['Đã Nộp Tiền'] || row['has_app_and_fee']),
       gplx_status: parseGPLXStatus(row['Trạng thái GPLX'] || row['gplx_status']),
       has_postal_up: parseBoolean(row['Up postal'] || row['has_postal_up']),
     }));

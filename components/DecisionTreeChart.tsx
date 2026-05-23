@@ -47,7 +47,7 @@ flowchart TD
     
     E -->|Rớt| D
     
-    E -->|Đậu ${report.pass_count}| F{"ĐK App + Tiền?"}
+    E -->|Đậu ${report.pass_count}| F{"Đã Nộp Tiền?"}
     
     F -->|Có ${report.with_app_and_fee.total}| G{"GPLX về +<br/>up postal?"}
     F -->|Không ${report.without_fee.total}| H{"GPLX về?"}
