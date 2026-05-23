@@ -12,6 +12,7 @@ export function parseExcelFile(fileBuffer: Buffer): Map<string, Candidate[]> {
     const candidates: Candidate[] = rawData.map((row: any, index: number) => ({
       sbd: row['SBD'] || row['ID'] || row['Mã HV'] || `HV${String(index + 1).padStart(3, '0')}`,
       name: row['Họ tên'] || row['Name'] || '',
+      date_of_birth: row['Ngày Sinh'] || row['Date Of Birth'] || row['DOB'] || undefined,
       phone: row['Số Điện Thoại'] || row['Phone'] || undefined,
       receive_location: row['Nơi Nhận'] || row['Receive Location'] || undefined,
       tracking_number: row['Mã Vận Đơn'] || row['Tracking Number'] || undefined,

@@ -4,6 +4,7 @@ export type GPLXStatus = 'Returned' | 'Pending';
 export interface Candidate {
   sbd: string; // Số báo danh (thay cho ID)
   name: string;
+  date_of_birth?: string; // Ngày sinh
   phone?: string; // Số điện thoại
   receive_location?: string; // Nơi nhận
   tracking_number?: string; // Mã vận đơn

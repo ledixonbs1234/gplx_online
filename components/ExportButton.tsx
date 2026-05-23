@@ -52,10 +52,11 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
 
     // Sheet 2: Danh sách chi tiết
     const detailData = [
-      ['SBD', 'Họ tên', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Ngày thi', 'Có hồ sơ', 'Kết quả', 'Đã Nộp Tiền', 'GPLX', 'Đã Up Portal'],
+      ['SBD', 'Họ tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Ngày thi', 'Có hồ sơ', 'Kết quả', 'Đã Nộp Tiền', 'GPLX', 'Đã Up Portal'],
       ...candidates.map((c) => [
         c.sbd,
         c.name,
+        c.date_of_birth || '',
         c.phone || '',
         c.receive_location || '',
         c.tracking_number || '',
@@ -72,6 +73,7 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
     detailSheet['!cols'] = [
       { wch: 12 },
       { wch: 25 },
+      { wch: 15 },
       { wch: 15 },
       { wch: 20 },
       { wch: 15 },
