@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarIcon, Users, FileSpreadsheet, Search, Plus, ExternalLink, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, FileSpreadsheet, Search, Plus, ExternalLink, Upload, CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -47,6 +47,7 @@ export default function CandidatesPage() {
   const [isUpdatingCode, setIsUpdatingCode] = useState(false);
   const [updateResult, setUpdateResult] = useState<{ success: boolean; message: string; updatedCount?: number; notFoundCount?: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isExportingPending, setIsExportingPending] = useState(false);
 
   // Helper chuyển đổi định dạng chuỗi ngày (dd-MM-yyyy hoặc yyyy-MM-dd) sang Object Date
   const parseSheetDate = (sheetName: string): Date => {
@@ -226,6 +227,76 @@ export default function CandidatesPage() {
     const file = event.target.files?.[0];
     if (file) {
       handleUpdateCode(file);
+    }
+  };
+
+  // Xử lý xuất Excel danh sách GPLX trạng thái Chờ
+  const handleExportPendingGPLX = async () => {
+    if (!selectedDate) return;
+
+    setIsExportingPending(true);
+    try {
+      // Lọc danh sách học viên có gplx_status = 'Pending' (Chờ)
+      const pendingCandidates = candidates.filter(c => c.gplx_status === 'Pending');
+
+      if (pendingCandidates.length === 0) {
+        alert('Không có học viên nào có trạng thái GPLX "Chờ" cho ngày này.');
+        setIsExportingPending(false);
+        return;
+      }
+
+      // Tạo dữ liệu Excel
+      const excelData = [
+        ['SBD', 'Họ Tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Kết Quả', 'Đã Nộp Tiền', 'Trạng Thái GPLX'],
+        ...pendingCandidates.map((c) => [
+          c.sbd,
+          c.name,
+          c.date_of_birth || '',
+          c.phone || '',
+          c.receive_location || '',
+          c.tracking_number || '',
+          c.exam_status === 'Pass' ? 'Đậu' : c.exam_status === 'Fail' ? 'Rớt' : 'Chưa thi',
+          c.has_app_and_fee ? 'Đã Nộp' : 'Chưa Nộp',
+          'Chờ',
+        ]),
+      ];
+
+      // Sử dụng xlsx để tạo file Excel
+      const XLSX = await import('xlsx');
+      const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+      
+      // Đặt độ rộng cột
+      worksheet['!cols'] = [
+        { wch: 12 },  // SBD
+        { wch: 30 },  // Họ tên
+        { wch: 15 },  // Ngày sinh
+        { wch: 15 },  // Số điện thoại
+        { wch: 25 },  // Nơi nhận
+        { wch: 20 },  // Mã vận đơn
+        { wch: 12 },  // Kết quả
+        { wch: 15 },  // Đã nộp tiền
+        { wch: 18 },  // Trạng thái GPLX
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Danh sách chưa có GPLX');
+
+      // Xuất file
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const data = new Blob([excelBuffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+
+      // Tạo tên file: Danh Sách Chưa Có GPLX ngày dd-MM-yyyy
+      const fileName = `Danh Sách Chưa Có GPLX ngày ${format(selectedDate, 'dd-MM-yyyy')}.xlsx`;
+      
+      const { saveAs } = await import('file-saver');
+      saveAs(data, fileName);
+    } catch (error: any) {
+      console.error('Error exporting pending GPLX:', error);
+      alert('Có lỗi xảy ra khi xuất file Excel: ' + (error.message || 'Lỗi không xác định'));
+    } finally {
+      setIsExportingPending(false);
     }
   };
 
@@ -455,7 +526,30 @@ export default function CandidatesPage() {
                     </Badge>
                   )}
                 </span>
-                {isLoading && <span className="text-sm text-muted-foreground">Đang tải...</span>}
+                <div className="flex items-center gap-2">
+                  {isLoading && <span className="text-sm text-muted-foreground">Đang tải...</span>}
+                  {/* Button xuất Excel danh sách GPLX trạng thái Chờ */}
+                  {selectedDate && (
+                    <Button
+                      onClick={handleExportPendingGPLX}
+                      disabled={isExportingPending || filteredCandidates.length === 0}
+                      size="sm"
+                      variant="outline"
+                    >
+                      {isExportingPending ? (
+                        <>
+                          <span className="animate-spin mr-2">⏳</span>
+                          Đang xuất...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-4 w-4" />
+                          Xuất Excel GPLX Chờ
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
