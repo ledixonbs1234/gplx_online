@@ -53,8 +53,9 @@ export async function GET(request: Request) {
             candidate.phone,
           ].filter(Boolean).map(f => String(f).toLowerCase().trim());
 
-          // Kiểm tra nếu mã hiệu khớp với bất kỳ trường nào
-          if (codeFields.some(field => field === searchTerm || field.includes(searchTerm))) {
+          // Kiểm tra nếu mã hiệu khớp CHÍNH XÁC với bất kỳ trường nào
+          // Chỉ khớp chính xác hoàn toàn, không dùng includes
+          if (codeFields.some(field => field === searchTerm)) {
             candidates.push({
               ...candidate,
               exam_date: sheetName,
@@ -67,10 +68,22 @@ export async function GET(request: Request) {
     else if (query) {
       const searchTerm = query.toLowerCase().trim();
       
+      // Kiểm tra xem searchTerm có phải là số thuần túy không (SBD)
+      const isPureNumber = /^\d+$/.test(searchTerm);
+      
       for (const [sheetName, sheetCandidates] of allData.entries()) {
         for (const candidate of sheetCandidates) {
-          const nameMatch = candidate.name.toLowerCase().includes(searchTerm);
-          const sbdMatch = candidate.sbd.toLowerCase().includes(searchTerm);
+          let nameMatch = false;
+          let sbdMatch = false;
+          
+          if (isPureNumber) {
+            // Nếu là số thuần túy, chỉ khớp chính xác SBD
+            sbdMatch = candidate.sbd.toLowerCase().trim() === searchTerm;
+          } else {
+            // Nếu không phải số thuần túy, tìm gần đúng theo tên hoặc SBD
+            nameMatch = candidate.name.toLowerCase().includes(searchTerm);
+            sbdMatch = candidate.sbd.toLowerCase().includes(searchTerm);
+          }
           
           if (nameMatch || sbdMatch) {
             candidates.push({

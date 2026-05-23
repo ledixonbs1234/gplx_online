@@ -1,43 +1,59 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+```
+# Dependencies
+node_modules/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
 
-# testing
-/coverage
+# Build outputs
+build/
+dist/
+*.egg-info/
 
-# next.js
-/.next/
-/out/
+# Logs
+*.log
 
-# production
-/build
+# Environment variables
+.env
+.env.local
+.env.*
+!.env.example
 
-# misc
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
-*.pem
+Thumbs.db
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+# Coverage
+.coverage
+coverage/
+htmlcov/
 
-# env files (can opt-in for committing if needed)
-.env*
+# Testing
+.pytest_cache/
+.mypy_cache/
+.nyc_output/
+coverage/lcov-report/
 
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-google-credentials.json
-*.google-credentials.json
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+```

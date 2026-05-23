@@ -37,7 +37,8 @@ const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag
 export default function ScannerPage() {
   const [sheetsList, setSheetsList] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('all');
-  const [searchInput, setSearchInput] = useState('');
+  const [unifiedInput, setUnifiedInput] = useState('');
+  const [searchMode, setSearchMode] = useState<'qr' | 'name_sbd'>('qr');
   const [scannedCandidates, setScannedCandidates] = useState<ScannedCandidate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -104,24 +105,24 @@ export default function ScannerPage() {
     }
     
     // Clear input để quét tiếp
-    setSearchInput('');
+    setUnifiedInput('');
     qrInputRef.current?.focus();
   };
 
   // Xử lý khi nhấn Enter ở ô QR
   const handleQRKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      handleQRScan(searchInput);
+      handleQRScan(unifiedInput);
     }
   };
 
   // Tìm kiếm theo tên hoặc SBD
   const handleSearch = async () => {
-    if (!searchInput.trim()) return;
+    if (!unifiedInput.trim()) return;
     
     setIsSearching(true);
     try {
-      const response = await fetch(`/api/scanner/search?query=${encodeURIComponent(searchInput)}&date=${selectedDate}&type=name_sbd`, {
+      const response = await fetch(`/api/scanner/search?query=${encodeURIComponent(unifiedInput)}&date=${selectedDate}&type=name_sbd`, {
         method: 'GET',
       });
       const result = await response.json();
@@ -141,7 +142,7 @@ export default function ScannerPage() {
           ];
         });
       } else {
-        alert(`Không tìm thấy thí sinh với từ khóa: ${searchInput}`);
+        alert(`Không tìm thấy thí sinh với từ khóa: ${unifiedInput}`);
       }
     } catch (error) {
       console.error('Error searching:', error);
@@ -270,50 +271,69 @@ export default function ScannerPage() {
             </CardContent>
           </Card>
 
-          {/* Quét QR / Mã hiệu */}
-          <Card>
+          {/* Tìm kiếm thống nhất: Quét QR / Mã hiệu / Tên / SBD */}
+          <Card className="md:col-span-2">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <QrCode className="h-4 w-4" />
-                Quét mã hiệu (QR)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Input
-                ref={qrInputRef}
-                placeholder="Quét QR hoặc nhập mã hiệu..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={handleQRKeyDown}
-                disabled={isSearching}
-              />
-              <p className="text-xs text-muted-foreground mt-2">
-                Nhấn Enter sau khi quét hoặc nhập mã
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Tìm kiếm theo tên/SBD */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Search className="h-4 w-4" />
-                Tìm tên / SBD
+                Quét mã hiệu / Tìm tên hoặc SBD
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex gap-2">
                 <Input
-                  placeholder="Nhập tên hoặc SBD..."
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  ref={qrInputRef}
+                  placeholder="Quét QR, nhập mã hiệu, tên hoặc SBD..."
+                  value={unifiedInput}
+                  onChange={(e) => setUnifiedInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (searchMode === 'qr') {
+                        handleQRScan(unifiedInput);
+                      } else {
+                        handleSearch();
+                      }
+                    }
+                  }}
                   disabled={isSearching}
                 />
-                <Button onClick={handleSearch} disabled={isSearching || !searchInput.trim()}>
-                  {isSearching ? '⏳' : <Search className="h-4 w-4" />}
+                <Select value={searchMode} onValueChange={setSearchMode}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Chế độ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="qr">
+                      <span className="flex items-center gap-2">
+                        <QrCode className="h-4 w-4" />
+                        Quét mã
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="name_sbd">
+                      <span className="flex items-center gap-2">
+                        <Search className="h-4 w-4" />
+                        Tìm tên/SBD
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  onClick={() => {
+                    if (searchMode === 'qr') {
+                      handleQRScan(unifiedInput);
+                    } else {
+                      handleSearch();
+                    }
+                  }} 
+                  disabled={isSearching || !unifiedInput.trim()}
+                >
+                  {isSearching ? '⏳' : searchMode === 'qr' ? <QrCode className="h-4 w-4" /> : <Search className="h-4 w-4" />}
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {searchMode === 'qr' 
+                  ? 'Nhấn Enter sau khi quét QR hoặc nhập mã hiệu' 
+                  : 'Nhấn Enter để tìm kiếm theo tên hoặc SBD'}
+              </p>
             </CardContent>
           </Card>
         </motion.div>
