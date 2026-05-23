@@ -10,14 +10,17 @@ export function parseExcelFile(fileBuffer: Buffer): Map<string, Candidate[]> {
     const rawData = XLSX.utils.sheet_to_json(worksheet);
 
     const candidates: Candidate[] = rawData.map((row: any, index: number) => ({
-      id: row['ID'] || row['Mã HV'] || `HV${String(index + 1).padStart(3, '0')}`,
+      sbd: row['SBD'] || row['ID'] || row['Mã HV'] || `HV${String(index + 1).padStart(3, '0')}`,
       name: row['Họ tên'] || row['Name'] || '',
+      phone: row['Số Điện Thoại'] || row['Phone'] || undefined,
+      receive_location: row['Nơi Nhận'] || row['Receive Location'] || undefined,
+      tracking_number: row['Mã Vận Đơn'] || row['Tracking Number'] || undefined,
       exam_date: sheetName,
       has_profile: parseBoolean(row['Có hồ sơ'] || row['has_profile']),
       exam_status: parseExamStatus(row['Kết quả thi'] || row['exam_status']),
       has_app_and_fee: parseBoolean(row['Đã Nộp Tiền'] || row['has_app_and_fee']),
       gplx_status: parseGPLXStatus(row['Trạng thái GPLX'] || row['gplx_status']),
-      has_postal_up: parseBoolean(row['Up postal'] || row['has_postal_up']),
+      has_postal_up: parseBoolean(row['Đã Up Portal'] || row['Up portal'] || row['has_postal_up']),
     }));
 
     candidatesByDate.set(sheetName, candidates);

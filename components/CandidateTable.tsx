@@ -43,7 +43,7 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
 
   const filteredCandidates = candidates.filter((candidate) => {
     const matchesSearch = candidate.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         candidate.id.toLowerCase().includes(searchTerm.toLowerCase());
+                         candidate.sbd.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (activeFilter === 'all') return matchesSearch;
     
@@ -145,8 +145,11 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-4 py-2 text-left">ID</th>
+                <th className="px-4 py-2 text-left">SBD</th>
                 <th className="px-4 py-2 text-left">Họ tên</th>
+                <th className="px-4 py-2 text-left">Số Điện Thoại</th>
+                <th className="px-4 py-2 text-left">Nơi Nhận</th>
+                <th className="px-4 py-2 text-left">Mã Vận Đơn</th>
                 <th className="px-4 py-2 text-left">Ngày thi</th>
                 <th className="px-4 py-2 text-left">Hồ sơ</th>
                 <th className="px-4 py-2 text-left">Kết quả</th>
@@ -158,7 +161,7 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
             <tbody>
               {filteredCandidates.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <td colSpan={11} className="text-center py-8 text-muted-foreground">
                     Không có dữ liệu phù hợp
                   </td>
                 </tr>
@@ -166,9 +169,12 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
                 filteredCandidates.map((candidate) => {
                   const statusBadge = getStatusBadge(candidate);
                   return (
-                    <tr key={candidate.id} className="border-t hover:bg-muted/30">
-                      <td className="px-4 py-2 font-mono text-xs">{candidate.id}</td>
+                    <tr key={candidate.sbd} className="border-t hover:bg-muted/30">
+                      <td className="px-4 py-2 font-mono text-xs">{candidate.sbd}</td>
                       <td className="px-4 py-2 font-medium">{candidate.name}</td>
+                      <td className="px-4 py-2">{candidate.phone || '-'}</td>
+                      <td className="px-4 py-2">{candidate.receive_location || '-'}</td>
+                      <td className="px-4 py-2 font-mono text-xs">{candidate.tracking_number || '-'}</td>
                       <td className="px-4 py-2">{candidate.exam_date}</td>
                       <td className="px-4 py-2">
                         {candidate.has_profile ? '✅' : '❌'}

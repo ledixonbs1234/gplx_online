@@ -52,10 +52,13 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
 
     // Sheet 2: Danh sách chi tiết
     const detailData = [
-      ['ID', 'Họ tên', 'Ngày thi', 'Có hồ sơ', 'Kết quả', 'Đã Nộp Tiền', 'GPLX', 'Up postal'],
+      ['SBD', 'Họ tên', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Ngày thi', 'Có hồ sơ', 'Kết quả', 'Đã Nộp Tiền', 'GPLX', 'Đã Up Portal'],
       ...candidates.map((c) => [
-        c.id,
+        c.sbd,
         c.name,
+        c.phone || '',
+        c.receive_location || '',
+        c.tracking_number || '',
         c.exam_date,
         c.has_profile ? 'Có' : 'Không',
         c.exam_status,
@@ -67,8 +70,11 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
 
     const detailSheet = XLSX.utils.aoa_to_sheet(detailData);
     detailSheet['!cols'] = [
-      { wch: 10 },
+      { wch: 12 },
       { wch: 25 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 15 },
       { wch: 15 },
       { wch: 12 },
       { wch: 15 },
@@ -85,9 +91,9 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
     );
 
     const pendingData = [
-      ['ID', 'Họ tên', 'Ngày thi', 'Nhóm', 'Ghi chú'],
+      ['SBD', 'Họ tên', 'Ngày thi', 'Nhóm', 'Ghi chú'],
       ...pendingCandidates.map((c) => [
-        c.id,
+        c.sbd,
         c.name,
         c.exam_date,
         c.has_app_and_fee ? 'Đã Nộp Tiền' : 'Chưa Nộp Tiền',

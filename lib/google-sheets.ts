@@ -67,14 +67,17 @@ export async function readSheet(sheetName: string): Promise<Candidate[]> {
   const dataRows = rows.slice(1);
 
   return dataRows.map((row: any[], index: number) => ({
-    id: getCellValue(row, headers, ['id', 'mã hv', 'ma hv']) || `HV${String(index + 1).padStart(4, '0')}`,
+    sbd: getCellValue(row, headers, ['sbd', 'số báo danh', 'so bao danh', 'id', 'mã hv', 'ma hv']) || `HV${String(index + 1).padStart(4, '0')}`,
     name: getCellValue(row, headers, ['họ tên', 'ho ten', 'name', 'tên']) || '',
+    phone: getCellValue(row, headers, ['số điện thoại', 'so dien thoai', 'phone', 'điện thoại', 'dien thoai']) || undefined,
+    receive_location: getCellValue(row, headers, ['nơi nhận', 'noi nhan', 'receive_location']) || undefined,
+    tracking_number: getCellValue(row, headers, ['mã vận đơn', 'ma van don', 'tracking_number', 'tracking']) || undefined,
     exam_date: sheetName,
     has_profile: parseBool(getCellValue(row, headers, ['có hồ sơ', 'co ho so', 'has_profile'])),
     exam_status: parseExamStatus(getCellValue(row, headers, ['kết quả thi', 'ket qua thi', 'exam_status'])),
-    has_app_and_fee: parseBool(getCellValue(row, headers, ['đk app + tiền', 'dk app', 'has_app_and_fee'])),
+    has_app_and_fee: parseBool(getCellValue(row, headers, ['đã nộp tiền', 'da nop tien', 'đk app + tiền', 'dk app', 'has_app_and_fee'])),
     gplx_status: parseGPLXStatus(getCellValue(row, headers, ['trạng thái gplx', 'trang thai gplx', 'gplx_status'])),
-    has_postal_up: parseBool(getCellValue(row, headers, ['up postal', 'has_postal_up'])),
+    has_postal_up: parseBool(getCellValue(row, headers, ['đã up portal', 'da up portal', 'up portal', 'đã up', 'da up', 'up postal', 'has_postal_up'])),
   }));
 }
 
@@ -129,14 +132,14 @@ export async function createNewSheet(sheetName: string): Promise<void> {
     },
   });
 
-  // Thêm header
+  // Thêm header mới với đầy đủ các trường
   const headers = [
-    ['ID', 'Họ tên', 'Có hồ sơ', 'Kết quả thi', 'Đã Nộp Tiền', 'Trạng thái GPLX', 'Up postal'],
+    ['SBD', 'Họ tên', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Có hồ sơ', 'Kết quả thi', 'Đã Nộp Tiền', 'Trạng thái GPLX', 'Đã Up Portal'],
   ];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${sheetName}'!A1:G1`,
+    range: `'${sheetName}'!A1:J1`,
     valueInputOption: 'RAW',
     requestBody: { values: headers },
   });
@@ -150,8 +153,11 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
   const values = candidates.map((c) => [
-    c.id,
+    c.sbd,
     c.name,
+    c.phone || '',
+    c.receive_location || '',
+    c.tracking_number || '',
     c.has_profile ? 'Có' : 'Không',
     c.exam_status,
     c.has_app_and_fee ? 'Có' : 'Không',
@@ -161,7 +167,7 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${sheetName}'!A2:G${values.length + 1}`,
+    range: `'${sheetName}'!A2:J${values.length + 1}`,
     valueInputOption: 'RAW',
     requestBody: { values },
   });

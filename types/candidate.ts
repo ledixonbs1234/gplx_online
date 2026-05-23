@@ -2,8 +2,11 @@ export type ExamStatus = 'Pass' | 'Fail' | 'Not_Tested';
 export type GPLXStatus = 'Returned' | 'Pending';
 
 export interface Candidate {
-  id: string;
+  sbd: string; // Số báo danh (thay cho ID)
   name: string;
+  phone?: string; // Số điện thoại
+  receive_location?: string; // Nơi nhận
+  tracking_number?: string; // Mã vận đơn
   exam_date: string;
   has_profile: boolean;
   exam_status: ExamStatus;
