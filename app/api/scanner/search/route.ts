@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
 import { readAllSheets, findSheetNameWithFallback, readSheet } from '@/lib/google-sheets';
+import { sheetsCache, startCacheCleanup } from '@/lib/cache';
 import { Candidate } from '@/types/candidate';
 
 export const dynamic = 'force-dynamic';
+
+// Khởi tạo dọn dẹp cache định kỳ (chỉ chạy một lần khi module được load)
+let cleanupInitialized = false;
+if (!cleanupInitialized && typeof window === 'undefined') {
+  startCacheCleanup(10); // Dọn dẹp mỗi 10 phút
+  cleanupInitialized = true;
+}
 
 /**
  * API tìm kiếm thí sinh theo:
@@ -22,22 +30,39 @@ export async function GET(request: Request) {
     let candidates: Candidate[] = [];
     let allData: Map<string, Candidate[]> = new Map();
 
-    // Đọc dữ liệu từ tất cả sheets hoặc chỉ sheet được chọn
-    if (date === 'all') {
-      allData = await readAllSheets();
+    // Tạo cache key dựa trên ngày thi
+    const cacheKey = `sheets_data_${date}`;
+
+    // Kiểm tra cache trước khi đọc từ Google Sheets
+    const cachedData = sheetsCache.get<Map<string, Candidate[]>>(cacheKey);
+    
+    if (cachedData) {
+      console.log(`✅ Sử dụng cache cho ngày: ${date}`);
+      allData = cachedData;
     } else {
-      const resolvedSheetName = await findSheetNameWithFallback(date);
-      try {
-        const sheetCandidates = await readSheet(resolvedSheetName);
-        allData.set(resolvedSheetName, sheetCandidates);
-      } catch (error) {
-        // Sheet không tồn tại, trả về rỗng
-        return NextResponse.json({
-          success: true,
-          candidates: [],
-          message: `Không tìm thấy sheet cho ngày ${date}`,
-        });
+      console.log(`📡 Đọc dữ liệu từ Google Sheets cho ngày: ${date}`);
+      
+      // Đọc dữ liệu từ tất cả sheets hoặc chỉ sheet được chọn
+      if (date === 'all') {
+        allData = await readAllSheets();
+      } else {
+        const resolvedSheetName = await findSheetNameWithFallback(date);
+        try {
+          const sheetCandidates = await readSheet(resolvedSheetName);
+          allData.set(resolvedSheetName, sheetCandidates);
+        } catch (error) {
+          // Sheet không tồn tại, trả về rỗng
+          return NextResponse.json({
+            success: true,
+            candidates: [],
+            message: `Không tìm thấy sheet cho ngày ${date}`,
+          });
+        }
       }
+      
+      // Lưu vào cache với TTL 5 phút
+      sheetsCache.set(cacheKey, allData, 5);
+      console.log(`💾 Đã lưu cache cho ngày: ${date} (TTL: 5 phút)`);
     }
 
     // Tìm kiếm theo mã hiệu (QR code)
