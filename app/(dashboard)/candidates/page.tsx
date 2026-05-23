@@ -16,6 +16,7 @@ import { vi } from 'date-fns/locale';
 interface Candidate {
   sbd: string;
   name: string;
+  date_of_birth?: string;
   phone?: string;
   receive_location?: string;
   tracking_number?: string;
@@ -261,6 +262,7 @@ export default function CandidatesPage() {
                       <tr className="border-b">
                         <th className="text-left py-3 px-4 font-semibold">SBD</th>
                         <th className="text-left py-3 px-4 font-semibold">Họ tên</th>
+                        <th className="text-left py-3 px-4 font-semibold">Ngày Sinh</th>
                         <th className="text-left py-3 px-4 font-semibold">Số Điện Thoại</th>
                         <th className="text-left py-3 px-4 font-semibold">Nơi Nhận</th>
                         <th className="text-left py-3 px-4 font-semibold">Mã Vận Đơn</th>
@@ -276,6 +278,7 @@ export default function CandidatesPage() {
                         <tr key={candidate.sbd} className="border-b hover:bg-muted/50">
                           <td className="py-3 px-4 font-mono text-sm">{candidate.sbd}</td>
                           <td className="py-3 px-4 font-medium">{candidate.name}</td>
+                          <td className="py-3 px-4 text-sm">{candidate.date_of_birth || '-'}</td>
                           <td className="py-3 px-4 text-sm">{candidate.phone || '-'}</td>
                           <td className="py-3 px-4 text-sm">{candidate.receive_location || '-'}</td>
                           <td className="py-3 px-4 font-mono text-xs">{candidate.tracking_number || '-'}</td>

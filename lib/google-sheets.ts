@@ -69,6 +69,7 @@ export async function readSheet(sheetName: string): Promise<Candidate[]> {
   return dataRows.map((row: any[], index: number) => ({
     sbd: getCellValue(row, headers, ['sbd', 'số báo danh', 'so bao danh', 'id', 'mã hv', 'ma hv']) || `HV${String(index + 1).padStart(4, '0')}`,
     name: getCellValue(row, headers, ['họ tên', 'ho ten', 'name', 'tên']) || '',
+    date_of_birth: getCellValue(row, headers, ['ngày sinh', 'ngay sinh', 'date of birth', 'dob', 'birth date']) || undefined,
     phone: getCellValue(row, headers, ['số điện thoại', 'so dien thoai', 'phone', 'điện thoại', 'dien thoai']) || undefined,
     receive_location: getCellValue(row, headers, ['nơi nhận', 'noi nhan', 'receive_location']) || undefined,
     tracking_number: getCellValue(row, headers, ['mã vận đơn', 'ma van don', 'tracking_number', 'tracking']) || undefined,
@@ -134,12 +135,12 @@ export async function createNewSheet(sheetName: string): Promise<void> {
 
   // Thêm header mới với đầy đủ các trường
   const headers = [
-    ['SBD', 'Họ tên', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Có hồ sơ', 'Kết quả thi', 'Đã Nộp Tiền', 'Trạng thái GPLX', 'Đã Up Portal'],
+    ['SBD', 'Họ tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Có hồ sơ', 'Kết quả thi', 'Đã Nộp Tiền', 'Trạng thái GPLX', 'Đã Up Portal'],
   ];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${sheetName}'!A1:J1`,
+    range: `'${sheetName}'!A1:K1`,
     valueInputOption: 'RAW',
     requestBody: { values: headers },
   });
@@ -155,6 +156,7 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
   const values = candidates.map((c) => [
     c.sbd,
     c.name,
+    c.date_of_birth || '',
     c.phone || '',
     c.receive_location || '',
     c.tracking_number || '',
@@ -167,7 +169,7 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${sheetName}'!A2:J${values.length + 1}`,
+    range: `'${sheetName}'!A2:K${values.length + 1}`,
     valueInputOption: 'RAW',
     requestBody: { values },
   });
