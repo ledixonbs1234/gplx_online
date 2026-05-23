@@ -20,17 +20,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Đọc credentials
-    const credentialsPath = process.env.GOOGLE_CREDENTIALS_PATH || './google-credentials.json';
     let credentials;
-    try {
-      const absolutePath = path.resolve(credentialsPath);
-      credentials = JSON.parse(fs.readFileSync(absolutePath, 'utf-8'));
-    } catch (error) {
-      return NextResponse.json(
-        { success: false, error: 'Không thể đọc file credentials' },
-        { status: 500 }
-      );
+    if (process.env.GOOGLE_CREDENTIALS_CONTENT) {
+      credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_CONTENT);
+    } else {
+      const fs = require('fs');
+      const filePath = './google-credentials.json';
+      credentials = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     }
 
     const auth = new google.auth.GoogleAuth({
@@ -46,12 +42,12 @@ export async function POST(request: Request) {
     // Xử lý từng thí sinh
     for (const candidate of candidates) {
       const { sbd, exam_date } = candidate;
-      
+
       if (!sbd || !exam_date) continue;
 
       // Tìm sheet tương ứng với ngày thi
       const sheetName = exam_date;
-      
+
       try {
         // Đọc dữ liệu hiện tại của sheet
         const response = await sheets.spreadsheets.values.get({
@@ -64,9 +60,9 @@ export async function POST(request: Request) {
 
         // Dòng đầu là header
         const headers = rows[0].map((h: string) => h.toLowerCase().trim());
-        
+
         // Tìm index của các cột cần thiết
-        const sbdIndex = headers.findIndex(h => 
+        const sbdIndex = headers.findIndex(h =>
           ['sbd', 'số báo danh', 'so bao danh', 'id', 'mã hv', 'ma hv'].includes(h)
         );
         const profileIndex = headers.findIndex(h =>
@@ -91,7 +87,7 @@ export async function POST(request: Request) {
 
         // Cập nhật trạng thái
         const updates = [];
-        
+
         if (deleteType === 'profile' || deleteType === 'single') {
           if (profileIndex !== -1) {
             const profileColumn = String.fromCharCode('A'.charCodeAt(0) + profileIndex);
