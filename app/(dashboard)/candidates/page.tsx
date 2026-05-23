@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarIcon, Users, FileSpreadsheet, Search, Plus, ExternalLink } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, FileSpreadsheet, Search, Plus, ExternalLink, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -28,6 +28,13 @@ interface Candidate {
   has_postal_up?: boolean;
 }
 
+interface ExcelRow {
+  sbd: string;
+  fullName: string;
+  dateOfBirth?: string;
+  code?: string;
+}
+
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag-vDGsZgmH4rX_TicLtVwD-y696bgk/edit?usp=sharing';
 
 export default function CandidatesPage() {
@@ -36,6 +43,9 @@ export default function CandidatesPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [sheetsList, setSheetsList] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isUpdatingCode, setIsUpdatingCode] = useState(false);
+  const [updateResult, setUpdateResult] = useState<{ success: boolean; message: string; updatedCount?: number; notFoundCount?: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load danh sách sheets khi mount
   useEffect(() => {
@@ -93,6 +103,115 @@ export default function CandidatesPage() {
     notTested: filteredCandidates.filter(c => c.exam_status === 'Not_Tested').length,
     hasProfile: filteredCandidates.filter(c => c.has_profile).length,
     returnedGPLX: filteredCandidates.filter(c => c.gplx_status === 'Returned').length,
+  };
+
+  // Xử lý cập nhật mã hiệu từ file Excel
+  const handleUpdateCode = async (file: File) => {
+    if (!selectedDate) {
+      setUpdateResult({ success: false, message: 'Vui lòng chọn ngày thi trước' });
+      return;
+    }
+
+    setIsUpdatingCode(true);
+    setUpdateResult(null);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      
+      // Lấy sheet đầu tiên
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      
+      // Chuyển thành JSON với header là số hàng
+      const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      
+      // Parse dữ liệu từ hàng 4 trở đi (index 3)
+      const excelData: ExcelRow[] = [];
+      for (let i = 3; i < rawData.length; i++) {
+        const row = rawData[i];
+        if (!row || row.length === 0) continue;
+        
+        // Cột F (index 5) là mã hiệu
+        const code = row[5] ? String(row[5]).trim() : '';
+        
+        // Cột H (index 7) có nội dung "1 TRẦN VĂN AN 01/02/1980"
+        const colHContent = row[7] ? String(row[7]).trim() : '';
+        
+        if (!colHContent) continue;
+        
+        // Parse nội dung cột H: "1 TRẦN VĂN AN 01/02/1980"
+        // Số báo danh là số đầu tiên
+        const parts = colHContent.split(/\s+/);
+        const sbd = parts[0] || '';
+        
+        // Ngày sinh là phần cuối cùng (dd/mm/yyyy)
+        const dateOfBirth = parts[parts.length - 1] || '';
+        
+        // Tên là phần ở giữa (từ index 1 đến length-2)
+        const nameParts = parts.slice(1, parts.length - 1);
+        const fullName = nameParts.join(' ') || '';
+        
+        if (sbd && fullName) {
+          excelData.push({
+            sbd,
+            fullName,
+            dateOfBirth,
+            code,
+          });
+        }
+      }
+
+      if (excelData.length === 0) {
+        setUpdateResult({ success: false, message: 'Không tìm thấy dữ liệu trong file Excel' });
+        setIsUpdatingCode(false);
+        return;
+      }
+
+      // Gọi API để cập nhật
+      const examDate = format(selectedDate, 'yyyy-MM-dd');
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examDate,
+          excelData,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setUpdateResult({
+          success: true,
+          message: result.message,
+          updatedCount: result.updatedCount,
+          notFoundCount: result.notFoundCount,
+        });
+        
+        // Reload dữ liệu sau khi cập nhật
+        const refreshResponse = await fetch(`/api/sheets/data?date=${examDate}`);
+        const refreshResult = await refreshResponse.json();
+        if (refreshResult.success) {
+          setCandidates(refreshResult.candidates || []);
+        }
+      } else {
+        setUpdateResult({ success: false, message: result.error });
+      }
+    } catch (error: any) {
+      console.error('Error updating code:', error);
+      setUpdateResult({ success: false, message: error.message || 'Có lỗi xảy ra khi cập nhật' });
+    } finally {
+      setIsUpdatingCode(false);
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleUpdateCode(file);
+    }
   };
 
   return (
@@ -173,6 +292,77 @@ export default function CandidatesPage() {
                 <ExternalLink className="h-4 w-4" />
                 Mở Google Sheets
               </a>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Cập nhật mã hiệu từ Excel */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2 text-blue-700">
+                <Upload className="h-4 w-4" />
+                Cập nhật Mã Hiệu từ Excel
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Chọn file Excel có cấu trúc: hàng 4 trở đi, cột F là mã hiệu, cột H có nội dung "SBD Họ Tên Ngày Sinh"
+              </p>
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  disabled={!selectedDate || isUpdatingCode}
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!selectedDate || isUpdatingCode}
+                  className="flex-1"
+                >
+                  {isUpdatingCode ? (
+                    <>
+                      <span className="animate-spin mr-2">⏳</span>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Chọn file Excel
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {updateResult && (
+                <div className={`p-3 rounded-md flex items-start gap-2 ${
+                  updateResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {updateResult.success ? (
+                    <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                  )}
+                  <div className="text-sm">
+                    <p className="font-medium">{updateResult.message}</p>
+                    {updateResult.updatedCount !== undefined && (
+                      <p className="text-xs mt-1">
+                        ✓ Đã cập nhật: <strong>{updateResult.updatedCount}</strong> thí sinh
+                        {updateResult.notFoundCount !== undefined && updateResult.notFoundCount > 0 && (
+                          <span className="text-orange-600"> | Không tìm thấy: {updateResult.notFoundCount}</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
