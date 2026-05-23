@@ -260,7 +260,7 @@ export default function CandidatesPage() {
                         <th className="text-left py-3 px-4 font-semibold">Họ tên</th>
                         <th className="text-center py-3 px-4 font-semibold">Hồ sơ</th>
                         <th className="text-center py-3 px-4 font-semibold">Kết quả</th>
-                        <th className="text-center py-3 px-4 font-semibold">App + Phí</th>
+                        <th className="text-center py-3 px-4 font-semibold">Đã Nộp Tiền</th>
                         <th className="text-center py-3 px-4 font-semibold">GPLX</th>
                         <th className="text-center py-3 px-4 font-semibold">Postal</th>
                       </tr>

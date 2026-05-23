@@ -131,7 +131,7 @@ export async function createNewSheet(sheetName: string): Promise<void> {
 
   // Thêm header
   const headers = [
-    ['ID', 'Họ tên', 'Có hồ sơ', 'Kết quả thi', 'ĐK app + tiền', 'Trạng thái GPLX', 'Up postal'],
+    ['ID', 'Họ tên', 'Có hồ sơ', 'Kết quả thi', 'Đã Nộp Tiền', 'Trạng thái GPLX', 'Up postal'],
   ];
 
   await sheets.spreadsheets.values.update({

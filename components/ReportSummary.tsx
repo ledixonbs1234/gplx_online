@@ -47,7 +47,7 @@ export function ReportSummary({ report }: ReportSummaryProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">💰 Có ĐK App + Tiền</CardTitle>
+                <CardTitle className="text-lg">💰 Đã Nộp Tiền</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex justify-between">
@@ -71,7 +71,7 @@ export function ReportSummary({ report }: ReportSummaryProps) {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">💸 Không nộp tiền</CardTitle>
+                <CardTitle className="text-lg">💸 Chưa Nộp Tiền</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex justify-between">

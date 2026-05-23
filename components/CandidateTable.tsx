@@ -77,8 +77,8 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
     { key: 'fail', label: '🚫 Rớt', color: 'bg-orange-100' },
     { key: 'pass_with_app_postal', label: '✅ App + Postal', color: 'bg-green-100' },
     { key: 'pass_with_app_pending', label: '⏳ App - Chờ GPLX', color: 'bg-yellow-100' },
-    { key: 'pass_no_fee_returned', label: '💸 Không tiền - Có GPLX', color: 'bg-blue-100' },
-    { key: 'pass_no_fee_pending', label: '⏸️ Không tiền - Chờ', color: 'bg-purple-100' },
+    { key: 'pass_no_fee_returned', label: '💸 Chưa Nộp - Có GPLX', color: 'bg-blue-100' },
+    { key: 'pass_no_fee_pending', label: '⏸️ Chưa Nộp - Chờ', color: 'bg-purple-100' },
   ];
 
   const getStatusBadge = (candidate: Candidate) => {
@@ -88,8 +88,8 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
       fail: { label: 'Rớt', variant: 'destructive' as const },
       pass_with_app_postal: { label: 'Đã up postal', variant: 'default' as const },
       pass_with_app_pending: { label: 'Chờ GPLX', variant: 'secondary' as const },
-      pass_no_fee_returned: { label: 'GPLX về', variant: 'outline' as const },
-      pass_no_fee_pending: { label: 'Chưa nộp tiền', variant: 'secondary' as const },
+      pass_no_fee_returned: { label: 'Chưa Nộp - GPLX về', variant: 'outline' as const },
+      pass_no_fee_pending: { label: 'Chưa Nộp - Chờ', variant: 'secondary' as const },
       all: { label: 'N/A', variant: 'outline' as const },
     };
     return config[category];
@@ -150,7 +150,7 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
                 <th className="px-4 py-2 text-left">Ngày thi</th>
                 <th className="px-4 py-2 text-left">Hồ sơ</th>
                 <th className="px-4 py-2 text-left">Kết quả</th>
-                <th className="px-4 py-2 text-left">App + Tiền</th>
+                <th className="px-4 py-2 text-left">Đã Nộp Tiền</th>
                 <th className="px-4 py-2 text-left">GPLX</th>
                 <th className="px-4 py-2 text-left">Trạng thái</th>
               </tr>
@@ -178,7 +178,7 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
                          candidate.exam_status === 'Fail' ? '❌ Rớt' : '⚪ Chưa thi'}
                       </td>
                       <td className="px-4 py-2">
-                        {candidate.has_app_and_fee ? '💰 Có' : '💸 Không'}
+                        {candidate.has_app_and_fee ? '💰 Đã Nộp' : '💸 Chưa Nộp'}
                       </td>
                       <td className="px-4 py-2">
                         {candidate.gplx_status === 'Returned' ? '📬 Về' : '⏳ Chờ'}

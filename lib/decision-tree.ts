@@ -37,7 +37,7 @@ export function analyzeDecisionTree(candidates: Candidate[]): DayReport {
 
       // Nhánh 2: Có hồ sơ + Thi đậu
       if (candidate.has_app_and_fee) {
-        // Nhánh 2.1: Có ĐK app + tiền
+        // Nhánh 2.1: Có Đã Nộp Tiền
         report.with_app_and_fee.total++;
         
         if (candidate.gplx_status === 'Returned' && candidate.has_postal_up) {
@@ -46,7 +46,7 @@ export function analyzeDecisionTree(candidates: Candidate[]): DayReport {
           report.with_app_and_fee.pending++;
         }
       } else {
-        // Nhánh 2.2: Không nộp tiền
+        // Nhánh 2.2: Chưa nộp tiền
         report.without_fee.total++;
         
         if (candidate.gplx_status === 'Returned') {
@@ -72,11 +72,11 @@ export function generateReportSummary(report: DayReport): string {
 
 ✅ THI ĐẬU: ${report.pass_count} người
 
-   💰 CÓ ĐK APP + TIỀN: ${report.with_app_and_fee.total} người
+   💰 ĐÃ NỘP TIỀN: ${report.with_app_and_fee.total} người
       • GPLX về + up postal: ${report.with_app_and_fee.returned_with_postal}
       • GPLX chưa về: ${report.with_app_and_fee.pending}
 
-   💸 KHÔNG NỘP TIỀN: ${report.without_fee.total} người
+   💸 CHƯA NỘP TIỀN: ${report.without_fee.total} người
       • GPLX về: ${report.without_fee.returned}
       • GPLX chưa về: ${report.without_fee.pending}
 
