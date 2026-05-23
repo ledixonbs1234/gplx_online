@@ -14,8 +14,11 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
 interface Candidate {
-  id: string;
+  sbd: string;
   name: string;
+  phone?: string;
+  receive_location?: string;
+  tracking_number?: string;
   exam_date: string;
   has_profile: boolean;
   exam_status: 'Pass' | 'Fail' | 'Not_Tested';
@@ -78,7 +81,7 @@ export default function CandidatesPage() {
   // Lọc học viên theo tìm kiếm
   const filteredCandidates = candidates.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.id.toLowerCase().includes(searchTerm.toLowerCase())
+    c.sbd.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Thống kê
@@ -256,8 +259,11 @@ export default function CandidatesPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-semibold">Mã HV</th>
+                        <th className="text-left py-3 px-4 font-semibold">SBD</th>
                         <th className="text-left py-3 px-4 font-semibold">Họ tên</th>
+                        <th className="text-left py-3 px-4 font-semibold">Số Điện Thoại</th>
+                        <th className="text-left py-3 px-4 font-semibold">Nơi Nhận</th>
+                        <th className="text-left py-3 px-4 font-semibold">Mã Vận Đơn</th>
                         <th className="text-center py-3 px-4 font-semibold">Hồ sơ</th>
                         <th className="text-center py-3 px-4 font-semibold">Kết quả</th>
                         <th className="text-center py-3 px-4 font-semibold">Đã Nộp Tiền</th>
@@ -267,9 +273,12 @@ export default function CandidatesPage() {
                     </thead>
                     <tbody>
                       {filteredCandidates.map((candidate) => (
-                        <tr key={candidate.id} className="border-b hover:bg-muted/50">
-                          <td className="py-3 px-4 font-mono text-sm">{candidate.id}</td>
+                        <tr key={candidate.sbd} className="border-b hover:bg-muted/50">
+                          <td className="py-3 px-4 font-mono text-sm">{candidate.sbd}</td>
                           <td className="py-3 px-4 font-medium">{candidate.name}</td>
+                          <td className="py-3 px-4 text-sm">{candidate.phone || '-'}</td>
+                          <td className="py-3 px-4 text-sm">{candidate.receive_location || '-'}</td>
+                          <td className="py-3 px-4 font-mono text-xs">{candidate.tracking_number || '-'}</td>
                           <td className="text-center py-3 px-4">
                             <Badge variant={candidate.has_profile ? 'default' : 'secondary'}>
                               {candidate.has_profile ? '✓' : '✗'}
