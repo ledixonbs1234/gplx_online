@@ -34,7 +34,47 @@ function getSheetsClient() {
 }
 
 /**
+ * Kiểm tra xem chuỗi có phải là định dạng ngày hợp lệ không (dd-MM-yyyy hoặc yyyy-MM-dd)
+ */
+export function isValidDateSheetName(name: string): boolean {
+  // Kiểm tra định dạng dd-MM-yyyy hoặc yyyy-MM-dd
+  const ddMMyyyyRegex = /^\d{2}-\d{2}-\d{4}$/;
+  const yyyyMMddRegex = /^\d{4}-\d{2}-\d{2}$/;
+  
+  if (!ddMMyyyyRegex.test(name) && !yyyyMMddRegex.test(name)) {
+    return false;
+  }
+  
+  const parts = name.split('-');
+  let day: number, month: number, year: number;
+  
+  if (parts[0].length === 4) {
+    // yyyy-MM-dd
+    year = parseInt(parts[0], 10);
+    month = parseInt(parts[1], 10);
+    day = parseInt(parts[2], 10);
+  } else {
+    // dd-MM-yyyy
+    day = parseInt(parts[0], 10);
+    month = parseInt(parts[1], 10);
+    year = parseInt(parts[2], 10);
+  }
+  
+  // Kiểm tra giá trị hợp lệ
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  if (year < 1900 || year > 2100) return false;
+  
+  // Kiểm tra số ngày trong tháng
+  const daysInMonth = new Date(year, month, 0).getDate();
+  if (day > daysInMonth) return false;
+  
+  return true;
+}
+
+/**
  * Lấy danh sách tất cả các Sheet (mỗi sheet = 1 ngày thi)
+ * Chỉ trả về các sheet có tên theo định dạng ngày hợp lệ
  */
 export async function getAllSheetNames(): Promise<string[]> {
   const sheets = getSheetsClient();
@@ -44,7 +84,18 @@ export async function getAllSheetNames(): Promise<string[]> {
     spreadsheetId,
   });
 
-  return response.data.sheets?.map((sheet: any) => sheet.properties.title) || [];
+  const allSheets = response.data.sheets?.map((sheet: any) => sheet.properties.title) || [];
+  
+  // Lọc chỉ lấy các sheet có tên là ngày hợp lệ (dd-MM-yyyy hoặc yyyy-MM-dd)
+  const validDateSheets = allSheets.filter(name => isValidDateSheetName(name));
+  
+  console.log(`📋 Tổng số sheet: ${allSheets.length}, Sheet có cấu trúc ngày hợp lệ: ${validDateSheets.length}`);
+  if (allSheets.length !== validDateSheets.length) {
+    const invalidSheets = allSheets.filter(name => !isValidDateSheetName(name));
+    console.log(`⚠️ Các sheet bị loại trừ (không có cấu trúc ngày):`, invalidSheets);
+  }
+  
+  return validDateSheets;
 }
 
 /**
