@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
-import { RefreshCw, Plus, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { RefreshCw, Plus, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface GoogleSheetsSyncProps {
@@ -21,6 +21,9 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
     message: string;
   }>({ type: null, message: '' });
   const [sheetCount, setSheetCount] = useState<number>(0);
+  const [sheetsList, setSheetsList] = useState<string[]>([]);
+
+  const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag-vDGsZgmH4rX_TicLtVwD-y696bgk/edit?usp=sharing';
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -32,6 +35,7 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
 
       if (result.success) {
         setSheetCount(result.totalSheets);
+        setSheetsList(result.sheets || []);
         onSyncComplete(result.data);
         setStatus({
           type: 'success',
@@ -151,6 +155,39 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
             )}
             <span>{status.message}</span>
+          </div>
+        )}
+
+        {/* Link mở Google Sheets */}
+        <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200">
+          <div className="flex items-center gap-2 text-sm text-green-800">
+            <FileSpreadsheet className="h-4 w-4" />
+            <span className="font-medium">Mở Google Sheets để chỉnh sửa</span>
+          </div>
+          <a
+            href={GOOGLE_SHEET_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+          >
+            Mở ngay
+            <ArrowRight className="h-3 w-3" />
+          </a>
+        </div>
+
+        {/* Danh sách sheets */}
+        {sheetsList.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Danh sách sheet ({sheetsList.length})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {sheetsList.map((sheet) => (
+                <Badge key={sheet} variant="secondary" className="text-xs">
+                  📅 {sheet}
+                </Badge>
+              ))}
+            </div>
           </div>
         )}
 
