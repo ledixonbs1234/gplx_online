@@ -2,11 +2,13 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
-import { RefreshCw, Plus, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { RefreshCw, Plus, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, ArrowRight, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 interface GoogleSheetsSyncProps {
   onSyncComplete: (data: Record<string, any[]>) => void;
@@ -15,7 +17,7 @@ interface GoogleSheetsSyncProps {
 export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [newSheetName, setNewSheetName] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [status, setStatus] = useState<{
     type: 'success' | 'error' | null;
     message: string;
@@ -24,6 +26,11 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
   const [sheetsList, setSheetsList] = useState<string[]>([]);
 
   const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag-vDGsZgmH4rX_TicLtVwD-y696bgk/edit?usp=sharing';
+
+  // Format ngày theo dd-MM-yyyy
+  const getSheetNameFromDate = (date: Date) => {
+    return format(date, 'dd-MM-yyyy');
+  };
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -52,10 +59,7 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
   };
 
   const handleCreateSheet = async () => {
-    if (!newSheetName.trim()) {
-      setStatus({ type: 'error', message: 'Vui lòng nhập tên sheet' });
-      return;
-    }
+    const sheetName = getSheetNameFromDate(selectedDate);
 
     setIsCreating(true);
     setStatus({ type: null, message: '' });
@@ -64,13 +68,12 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
       const response = await fetch('/api/sheets/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheetName: newSheetName }),
+        body: JSON.stringify({ sheetName }),
       });
       const result = await response.json();
 
       if (result.success) {
         setStatus({ type: 'success', message: `✅ ${result.message}` });
-        setNewSheetName(format(new Date(), 'yyyy-MM-dd'));
       } else {
         setStatus({ type: 'error', message: `❌ ${result.error}` });
       }
@@ -116,13 +119,29 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
             )}
           </Button>
 
-          <div className="flex gap-2 flex-1">
-            <Input
-              placeholder="Tên sheet (VD: 2026-05-23)"
-              value={newSheetName}
-              onChange={(e) => setNewSheetName(e.target.value)}
-              className="flex-1"
-            />
+          <div className="flex gap-2 items-center">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[200px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, 'dd-MM-yyyy') : <span>Chọn ngày</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
             <Button
               onClick={handleCreateSheet}
               disabled={isCreating}
@@ -193,7 +212,8 @@ export function GoogleSheetsSync({ onSyncComplete }: GoogleSheetsSyncProps) {
 
         {/* Hướng dẫn */}
         <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
-          💡 <strong>Mẹo:</strong> Mỗi sheet tương ứng với một ngày thi. Tên sheet sẽ là ngày (VD: 2026-05-23).
+          💡 <strong>Mẹo:</strong> Mỗi sheet tương ứng với một ngày thi. Tên sheet sẽ là ngày theo định dạng dd-MM-yyyy (VD: 20-01-2025).
+          Chọn ngày từ lịch để tạo sheet mới, tránh sai sót khi nhập tay.
           Dữ liệu sẽ tự động được phân loại theo sơ đồ cây quyết định.
         </div>
       </CardContent>
