@@ -87,7 +87,7 @@ export default function ScannerPage() {
           );
           return [
             ...prev,
-            ...newCandidates.map(c => ({
+            ...newCandidates.map((c: any) => ({
               ...c,
               scannedAt: new Date(),
               scanMethod: 'qr' as const,
@@ -134,7 +134,7 @@ export default function ScannerPage() {
           );
           return [
             ...prev,
-            ...newCandidates.map(c => ({
+            ...newCandidates.map((c: any) => ({
               ...c,
               scannedAt: new Date(),
               scanMethod: 'search' as const,
@@ -297,8 +297,8 @@ export default function ScannerPage() {
                   }}
                   disabled={isSearching}
                 />
-                <Select value={searchMode} onValueChange={setSearchMode}>
-                  <SelectTrigger className="w-[140px]">
+                <Select value={searchMode} onValueChange={(value) => setSearchMode(value as 'qr' | 'name_sbd')}>
+                  <SelectTrigger className="w-[250px]">
                     <SelectValue placeholder="Chế độ" />
                   </SelectTrigger>
                   <SelectContent>
