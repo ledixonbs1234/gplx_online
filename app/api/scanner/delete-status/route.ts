@@ -21,12 +21,29 @@ export async function POST(request: Request) {
     }
 
     let credentials;
+   
     if (process.env.GOOGLE_CREDENTIALS_CONTENT) {
-      credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_CONTENT);
+      try {
+        credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_CONTENT);
+      } catch (error) {
+        return NextResponse.json(
+          { success: false, error: 'Không thể parse biến môi trường GOOGLE_CREDENTIALS_CONTENT' },
+          { status: 500 }
+        );
+      }
     } else {
-      const fs = require('fs');
-      const filePath = './google-credentials.json';
-      credentials = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const credentialsPath = process.env.GOOGLE_CREDENTIALS_PATH || './google-credentials.json';
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const absolutePath = path.resolve(credentialsPath);
+        credentials = JSON.parse(fs.readFileSync(absolutePath, 'utf-8'));
+      } catch (error) {
+        return NextResponse.json(
+          { success: false, error: 'Không thể đọc file credentials. Hãy thiết lập biến môi trường GOOGLE_CREDENTIALS_CONTENT trên Vercel.' },
+          { status: 500 }
+        );
+      }
     }
 
     const auth = new google.auth.GoogleAuth({

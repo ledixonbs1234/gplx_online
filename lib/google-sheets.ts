@@ -10,12 +10,25 @@ function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
   let credentials;
+ // Ưu tiên đọc từ biến môi trường GOOGLE_CREDENTIALS_CONTENT (cho Vercel)
   if (process.env.GOOGLE_CREDENTIALS_CONTENT) {
-    credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_CONTENT);
+    try {
+      credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_CONTENT);
+    } catch (error) {
+      throw new Error('Không thể parse biến môi trường GOOGLE_CREDENTIALS_CONTENT. Đảm bảo nội dung là JSON hợp lệ.');
+    }
   } else {
-    const fs = require('fs');
-    const filePath = './google-credentials.json';
-    credentials = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    // Fallback: đọc từ file (cho development local)
+    const credentialsPath = process.env.GOOGLE_CREDENTIALS_PATH || './google-credentials.json';
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const absolutePath = path.resolve(credentialsPath);
+      credentials = JSON.parse(fs.readFileSync(absolutePath, 'utf-8'));
+    } catch (error) {
+      throw new Error(`Không thể đọc file credentials tại: ${credentialsPath}.
+      Hãy đảm bảo file google-credentials.json tồn tại hoặc thiết lập biến môi trường GOOGLE_CREDENTIALS_CONTENT.`);
+    }
   }
 
   const auth = new google.auth.GoogleAuth({
