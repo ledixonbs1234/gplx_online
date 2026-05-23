@@ -1,71 +1,43 @@
-```
-# Dependencies
-node_modules/
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Build outputs
-dist/
-build/
-.next/
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
-# Environment variables
-.env
-.env.local
-.env.*
+# testing
+/coverage
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
+# next.js
+/.next/
+/out/
 
-# Logs
-*.log
+# production
+/build
 
-# Temporary files
-*.tmp
-
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# MyPy cache
-.mypy_cache/
-
-# Pytest cache
-.pytest_cache/
-
-# OS generated files
+# misc
 .DS_Store
-Thumbs.db
+*.pem
 
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
-```
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+google-credentials.json
+*.google-credentials.json
