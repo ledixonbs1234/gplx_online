@@ -21,7 +21,9 @@ import {
   FileSpreadsheet,
   ExternalLink,
   Plus,
-  Eraser
+  Eraser,
+  Camera,
+  Smartphone
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -45,7 +47,9 @@ export default function ScannerPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [candidateToDelete, setCandidateToDelete] = useState<ScannedCandidate | null>(null);
   const [deleteType, setDeleteType] = useState<'single' | 'profile' | 'gplx'>('single');
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
   const qrInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Load danh sách sheets khi mount
   useEffect(() => {
@@ -67,6 +71,67 @@ export default function ScannerPage() {
   useEffect(() => {
     qrInputRef.current?.focus();
   }, []);
+
+  // Đóng camera scanner khi click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowCameraScanner(false);
+      }
+    };
+
+    if (showCameraScanner) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showCameraScanner]);
+
+  // Khởi tạo QR code scanner khi modal mở
+  useEffect(() => {
+    if (showCameraScanner && typeof window !== 'undefined') {
+      // Dynamically load html5-qrcode
+      const initScanner = async () => {
+        try {
+          const { Html5Qrcode } = await import('html5-qrcode');
+          
+          const html5QrCode = new Html5Qrcode('qr-reader');
+          
+          const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+          
+          // Request camera permissions and start scanning
+          html5QrCode.start(
+            { facingMode: 'environment' },
+            config,
+            (decodedText) => {
+              handleCameraScanResult(decodedText);
+            },
+            (error) => {
+              console.log('Scan error:', error);
+            }
+          ).catch((err) => {
+            console.error('Unable to start scanning', err);
+          });
+          
+          // Store instance for cleanup
+          (window as any).qrCodeScanner = html5QrCode;
+        } catch (error) {
+          console.error('Failed to load QR scanner:', error);
+        }
+      };
+      
+      initScanner();
+    }
+    
+    // Cleanup when modal closes
+    return () => {
+      if ((window as any).qrCodeScanner) {
+        (window as any).qrCodeScanner.stop().catch(console.error);
+        (window as any).qrCodeScanner = null;
+      }
+    };
+  }, [showCameraScanner]);
 
   // Xử lý khi quét QR hoặc nhập mã hiệu
   const handleQRScan = async (code: string) => {
@@ -160,6 +225,22 @@ export default function ScannerPage() {
   // Xóa toàn bộ danh sách
   const clearAll = () => {
     setScannedCandidates([]);
+  };
+
+  // Xử lý kết quả từ camera scanner
+  const handleCameraScanResult = (code: string) => {
+    if (!code.trim()) return;
+    
+    // Stop scanning after successful scan
+    if ((window as any).qrCodeScanner) {
+      (window as any).qrCodeScanner.stop().then(() => {
+        (window as any).qrCodeScanner = null;
+      }).catch(console.error);
+    }
+    
+    setUnifiedInput(code);
+    handleQRScan(code);
+    setShowCameraScanner(false);
   };
 
   // Mở dialog xóa
@@ -280,7 +361,7 @@ export default function ScannerPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   ref={qrInputRef}
                   placeholder="Quét QR, nhập mã hiệu, tên hoặc SBD..."
@@ -296,38 +377,53 @@ export default function ScannerPage() {
                     }
                   }}
                   disabled={isSearching}
+                  className="flex-1"
                 />
-                <Select value={searchMode} onValueChange={(value) => setSearchMode(value as 'qr' | 'name_sbd')}>
-                  <SelectTrigger className="w-[250px]">
-                    <SelectValue placeholder="Chế độ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="qr">
-                      <span className="flex items-center gap-2">
-                        <QrCode className="h-4 w-4" />
-                        Quét mã
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="name_sbd">
-                      <span className="flex items-center gap-2">
-                        <Search className="h-4 w-4" />
-                        Tìm tên/SBD
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button 
-                  onClick={() => {
-                    if (searchMode === 'qr') {
-                      handleQRScan(unifiedInput);
-                    } else {
-                      handleSearch();
-                    }
-                  }} 
-                  disabled={isSearching || !unifiedInput.trim()}
-                >
-                  {isSearching ? '⏳' : searchMode === 'qr' ? <QrCode className="h-4 w-4" /> : <Search className="h-4 w-4" />}
-                </Button>
+                <div className="flex gap-2">
+                  <Select value={searchMode} onValueChange={(value) => setSearchMode(value as 'qr' | 'name_sbd')}>
+                    <SelectTrigger className="w-full sm:w-[140px]">
+                      <SelectValue placeholder="Chế độ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="qr">
+                        <span className="flex items-center gap-2">
+                          <QrCode className="h-4 w-4" />
+                          Quét mã
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="name_sbd">
+                        <span className="flex items-center gap-2">
+                          <Search className="h-4 w-4" />
+                          Tìm tên/SBD
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    onClick={() => {
+                      if (searchMode === 'qr') {
+                        handleQRScan(unifiedInput);
+                      } else {
+                        handleSearch();
+                      }
+                    }} 
+                    disabled={isSearching || !unifiedInput.trim()}
+                    size="icon"
+                    className="shrink-0"
+                  >
+                    {isSearching ? '⏳' : searchMode === 'qr' ? <QrCode className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                  {/* Nút mở camera scanner cho mobile */}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowCameraScanner(true)}
+                    className="shrink-0 sm:hidden"
+                    title="Mở camera quét QR"
+                  >
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 {searchMode === 'qr' 
@@ -359,7 +455,7 @@ export default function ScannerPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
         >
           <StatCard label="Đã quét" value={stats.total} color="from-blue-500 to-cyan-500" />
           <StatCard label="Có hồ sơ" value={stats.hasProfile} color="from-purple-500 to-pink-500" />
@@ -430,38 +526,38 @@ export default function ScannerPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left py-3 px-4 font-semibold">SBD</th>
-                          <th className="text-left py-3 px-4 font-semibold">Họ tên</th>
-                          <th className="text-left py-3 px-4 font-semibold">Ngày thi</th>
-                          <th className="text-center py-3 px-4 font-semibold">Hồ sơ</th>
-                          <th className="text-center py-3 px-4 font-semibold">Kết quả</th>
-                          <th className="text-center py-3 px-4 font-semibold">GPLX</th>
-                          <th className="text-center py-3 px-4 font-semibold">Thao tác</th>
+                          <th className="text-left py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">SBD</th>
+                          <th className="text-left py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">Họ tên</th>
+                          <th className="text-left py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap hidden sm:table-cell">Ngày thi</th>
+                          <th className="text-center py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">Hồ sơ</th>
+                          <th className="text-center py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">Kết quả</th>
+                          <th className="text-center py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap hidden md:table-cell">GPLX</th>
+                          <th className="text-center py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">Thao tác</th>
                         </tr>
                       </thead>
                       <tbody>
                         {scannedCandidates.map((candidate) => (
                           <tr key={`${candidate.sbd}-${candidate.exam_date}`} className="border-b hover:bg-muted/50">
-                            <td className="py-3 px-4 font-mono text-sm">{candidate.sbd}</td>
-                            <td className="py-3 px-4 font-medium">{candidate.name}</td>
-                            <td className="py-3 px-4 text-sm">{candidate.exam_date}</td>
-                            <td className="text-center py-3 px-4">
-                              <Badge variant={candidate.has_profile ? 'default' : 'secondary'}>
+                            <td className="py-3 px-2 sm:px-4 font-mono text-xs sm:text-sm">{candidate.sbd}</td>
+                            <td className="py-3 px-2 sm:px-4 font-medium text-xs sm:text-sm max-w-[120px] sm:max-w-none truncate">{candidate.name}</td>
+                            <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm hidden sm:table-cell">{candidate.exam_date}</td>
+                            <td className="text-center py-3 px-2 sm:px-4">
+                              <Badge variant={candidate.has_profile ? 'default' : 'secondary'} className="text-xs">
                                 {candidate.has_profile ? '✓' : '✗'}
                               </Badge>
                             </td>
-                            <td className="text-center py-3 px-4">
+                            <td className="text-center py-3 px-2 sm:px-4">
                               <StatusBadge status={candidate.exam_status} />
                             </td>
-                            <td className="text-center py-3 px-4">
-                              <Badge variant={candidate.gplx_status === 'Returned' ? 'default' : 'secondary'}>
+                            <td className="text-center py-3 px-2 sm:px-4 hidden md:table-cell">
+                              <Badge variant={candidate.gplx_status === 'Returned' ? 'default' : 'secondary'} className="text-xs">
                                 {candidate.gplx_status === 'Returned' ? 'Đã về' : 'Chờ'}
                               </Badge>
                             </td>
-                            <td className="text-center py-3 px-4">
+                            <td className="text-center py-3 px-2 sm:px-4">
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
                                 onClick={() => openDeleteDialog('single', candidate)}
                               >
                                 <Trash2 className="h-4 w-4 text-red-500" />
@@ -516,15 +612,61 @@ export default function ScannerPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Camera Scanner Modal for Mobile */}
+      {showCameraScanner && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowCameraScanner(false)}>
+          <div ref={containerRef} className="bg-background rounded-lg w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Camera className="h-5 w-5" />
+                Quét QR Code
+              </h3>
+              <Button variant="ghost" size="icon" onClick={() => setShowCameraScanner(false)}>
+                <XCircle className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-muted-foreground mb-4">
+                Sử dụng camera để quét mã QR. Vui lòng cấp quyền truy cập camera khi được yêu cầu.
+              </p>
+              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center mb-4 overflow-hidden">
+                <div id="qr-reader" className="w-full"></div>
+              </div>
+              <p className="text-xs text-center text-muted-foreground">
+                Hoặc nhập mã thủ công bên dưới
+              </p>
+              <div className="flex gap-2 mt-4">
+                <Input
+                  placeholder="Nhập mã hiệu..."
+                  value={unifiedInput}
+                  onChange={(e) => setUnifiedInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleQRScan(unifiedInput);
+                    }
+                  }}
+                />
+                <Button 
+                  onClick={() => handleQRScan(unifiedInput)}
+                  disabled={!unifiedInput.trim()}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className={`rounded-xl bg-gradient-to-br ${color} p-4 text-white shadow-lg`}>
+    <div className={`rounded-xl bg-gradient-to-br ${color} p-3 sm:p-4 text-white shadow-lg`}>
       <p className="text-xs opacity-90">{label}</p>
-      <p className="text-2xl font-bold">{value}</p>
+      <p className="text-xl sm:text-2xl font-bold">{value}</p>
     </div>
   );
 }
@@ -537,7 +679,7 @@ function StatusBadge({ status }: { status: 'Pass' | 'Fail' | 'Not_Tested' }) {
   };
   
   return (
-    <Badge className={`${config[status].color} text-white`}>
+    <Badge className={`${config[status].color} text-white text-xs`}>
       {config[status].label}
     </Badge>
   );
