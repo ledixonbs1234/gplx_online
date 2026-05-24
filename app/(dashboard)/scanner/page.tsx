@@ -169,8 +169,30 @@ export default function ScannerPage() {
     };
   }, [showCameraScanner]);
 
-  // Xử lý khi quét QR hoặc nhập mã hiệu
-  const handleQRScan = async (code: string) => {
+  // Xử lý kết quả từ camera scanner
+  const handleCameraScanResult = (code: string) => {
+    if (!code.trim()) return;
+    
+    // Kiểm tra trùng ngay tại đây để tránh gọi handleQRScan không cần thiết
+    // Extract code from possible formats (raw code or URL format)
+    const extractedCode = code.trim();
+    
+    // Kiểm tra xem mã này đã quét chưa trong danh sách hiện tại
+    const isDuplicate = scannedCandidates.some(c => c.sbd === extractedCode);
+    
+    // Nếu đã quét rồi thì không làm gì thêm (không rung, không kêu, không cập nhật input)
+    if (isDuplicate) {
+      console.log('Mã hiệu đã quét:', extractedCode);
+      return;
+    }
+    
+    // Chỉ gọi handleQRScan mà không cập nhật unifiedInput để tránh re-render liên tục
+    // Pass a flag to indicate this is from camera scan
+    performQRScan(extractedCode, true);
+  };
+
+  // Hàm thực hiện quét QR chung cho cả manual và camera
+  const performQRScan = async (code: string, fromCamera: boolean = false) => {
     if (!code.trim()) return;
     
     setIsSearching(true);
@@ -201,23 +223,35 @@ export default function ScannerPage() {
             ...newCandidates.map((c: any) => ({
               ...c,
               scannedAt: new Date(),
-              scanMethod: 'qr' as const,
+              scanMethod: fromCamera ? 'qr' : 'qr',
             }))
           ];
         });
       } else {
-        alert(`Không tìm thấy thí sinh với mã hiệu: ${code}`);
+        if (!fromCamera) {
+          alert(`Không tìm thấy thí sinh với mã hiệu: ${code}`);
+        }
       }
     } catch (error) {
       console.error('Error searching:', error);
-      alert('Có lỗi xảy ra khi tìm kiếm');
+      if (!fromCamera) {
+        alert('Có lỗi xảy ra khi tìm kiếm');
+      }
     } finally {
       setIsSearching(false);
     }
     
-    // Clear input để quét tiếp
-    setUnifiedInput('');
-    qrInputRef.current?.focus();
+    // Chỉ clear input khi không phải từ camera
+    if (!fromCamera) {
+      setUnifiedInput('');
+      qrInputRef.current?.focus();
+    }
+    // Nếu từ camera: không cập nhật input, giữ nguyên trạng thái để quét tiếp
+  };
+
+  // Xử lý khi quét QR hoặc nhập mã hiệu (deprecated - dùng performQRScan thay thế)
+  const handleQRScan = async (code: string) => {
+    performQRScan(code, false);
   };
 
   // Xử lý khi nhấn Enter ở ô QR
@@ -281,20 +315,6 @@ export default function ScannerPage() {
   // Xóa toàn bộ danh sách
   const clearAll = () => {
     setScannedCandidates([]);
-  };
-
-  // Xử lý kết quả từ camera scanner
-  const handleCameraScanResult = (code: string) => {
-    if (!code.trim()) return;
-    
-    // Kiểm tra xem mã này đã quét chưa (để không kêu/rung lại)
-    // Lưu ý: Chúng ta cần kiểm tra trước khi gọi handleQRScan
-    // Vì handleQRScan sẽ tự kiểm tra và kích hoạt phản hồi nếu có dữ liệu mới
-    
-    // Tiếp tục quét mà không đóng camera
-    // Chỉ cập nhật input và gọi xử lý
-    setUnifiedInput(code);
-    handleQRScan(code);
   };
 
   // Mở dialog xóa
