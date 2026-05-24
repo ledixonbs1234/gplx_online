@@ -6,6 +6,7 @@ export interface Candidate {
   name: string;
   date_of_birth?: string; // Ngày sinh
   phone?: string; // Số điện thoại
+  residence?: string; // Nơi cư trú
   receive_location?: string; // Nơi nhận
   tracking_number?: string; // Mã vận đơn
   exam_date: string;

@@ -168,6 +168,7 @@ export async function readSheet(sheetName: string): Promise<Candidate[]> {
     name: getCellValue(row, headers, ['họ tên', 'ho ten', 'name', 'tên']) || '',
     date_of_birth: getCellValue(row, headers, ['ngày sinh', 'ngay sinh', 'date of birth', 'dob', 'birth date']) || undefined,
     phone: getCellValue(row, headers, ['số điện thoại', 'so dien thoai', 'phone', 'điện thoại', 'dien thoai']) || undefined,
+    residence: getCellValue(row, headers, ['nơi cư trú', 'noi cu tru', 'residence', 'địa chỉ', 'dia chi']) || undefined,
     receive_location: getCellValue(row, headers, ['nơi nhận', 'noi nhan', 'receive_location']) || undefined,
     tracking_number: getCellValue(row, headers, ['mã vận đơn', 'ma van don', 'tracking_number', 'tracking']) || undefined,
     exam_date: actualSheetName,
@@ -232,12 +233,12 @@ export async function createNewSheet(sheetName: string): Promise<void> {
 
   // Thêm header mới với đầy đủ các trường
   const headers = [
-    ['SBD', 'Họ tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Có hồ sơ', 'Kết quả thi', 'Đã Nộp Tiền', 'Trạng thái GPLX', 'Đã Up Portal'],
+    ['SBD', 'Họ tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi cư trú', 'Nơi Nhận', 'Mã Vận Đơn', 'Có hồ sơ', 'Kết quả thi', 'Đã Nộp Tiền', 'Trạng thái GPLX', 'Đã Up Portal'],
   ];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${sheetName}'!A1:K1`,
+    range: `'${sheetName}'!A1:L1`,
     valueInputOption: 'RAW',
     requestBody: { values: headers },
   });
@@ -257,6 +258,7 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
     c.name,
     c.date_of_birth || '',
     c.phone || '',
+    c.residence || '',
     c.receive_location || '',
     c.tracking_number || '',
     c.has_profile ? 'Có' : 'Không',
@@ -268,7 +270,7 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${actualSheetName}'!A2:K${values.length + 1}`,
+    range: `'${actualSheetName}'!A2:L${values.length + 1}`,
     valueInputOption: 'RAW',
     requestBody: { values },
   });
@@ -290,6 +292,7 @@ export async function updateCandidatesInSheet(sheetName: string, candidates: Can
     c.name,
     c.date_of_birth || '',
     c.phone || '',
+    c.residence || '',
     c.receive_location || '',
     c.tracking_number || '',
     c.has_profile ? 'Có' : 'Không',
@@ -302,13 +305,13 @@ export async function updateCandidatesInSheet(sheetName: string, candidates: Can
   // Xóa dữ liệu cũ và ghi mới
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `'${actualSheetName}'!A2:K1000`,
+    range: `'${actualSheetName}'!A2:L1000`,
   });
 
   if (values.length > 0) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `'${actualSheetName}'!A2:K${lastRow}`,
+      range: `'${actualSheetName}'!A2:L${lastRow}`,
       valueInputOption: 'RAW',
       requestBody: { values },
     });
