@@ -84,10 +84,33 @@ export default function ScannerPage() {
   const [candidateToDelete, setCandidateToDelete] = useState<ScannedCandidate | null>(null);
   const [deleteType, setDeleteType] = useState<'single' | 'profile' | 'gplx'>('single');
   const [showCameraScanner, setShowCameraScanner] = useState(false);
-  // Lưu trữ các mã đang được xử lý để tránh quét trùng liên tục
-  const [processingCodes, setProcessingCodes] = useState<Set<string>>(new Set());
   const qrInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // --- CÁC REF ĐỂ KHẮC PHỤC LỖI TRÙNG LẶP & ĐỒNG BỘ CAMERA ---
+  const scannedCandidatesRef = useRef(scannedCandidates);
+  const selectedDateRef = useRef(selectedDate);
+  const lastScannedCodeRef = useRef<string | null>(null);
+  const lastScannedTimeRef = useRef<number>(0);
+  const isProcessingRef = useRef<boolean>(false);
+
+  // Đồng bộ state thực tế sang ref để camera (bị stale closure) đọc được dữ liệu mới nhất
+  useEffect(() => {
+    scannedCandidatesRef.current = scannedCandidates;
+  }, [scannedCandidates]);
+
+  useEffect(() => {
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
+
+  // Giải phóng khóa khi người dùng tắt modal camera
+  useEffect(() => {
+    if (!showCameraScanner) {
+      lastScannedCodeRef.current = null;
+      lastScannedTimeRef.current = 0;
+      isProcessingRef.current = false;
+    }
+  }, [showCameraScanner]);
 
   // Load danh sách sheets khi mount
   useEffect(() => {
@@ -129,7 +152,6 @@ export default function ScannerPage() {
   // Khởi tạo QR code scanner khi modal mở
   useEffect(() => {
     if (showCameraScanner && typeof window !== 'undefined') {
-      // Dynamically load html5-qrcode
       const initScanner = async () => {
         try {
           const { Html5Qrcode } = await import('html5-qrcode');
@@ -138,7 +160,7 @@ export default function ScannerPage() {
           
           const config = { fps: 10, qrbox: { width: 250, height: 250 } };
           
-          // Request camera permissions and start scanning
+          // Đăng ký camera
           html5QrCode.start(
             { facingMode: 'environment' },
             config,
@@ -152,7 +174,6 @@ export default function ScannerPage() {
             console.error('Unable to start scanning', err);
           });
           
-          // Store instance for cleanup
           (window as any).qrCodeScanner = html5QrCode;
         } catch (error) {
           console.error('Failed to load QR scanner:', error);
@@ -162,7 +183,6 @@ export default function ScannerPage() {
       initScanner();
     }
     
-    // Cleanup when modal closes
     return () => {
       if ((window as any).qrCodeScanner) {
         (window as any).qrCodeScanner.stop().catch(console.error);
@@ -176,23 +196,31 @@ export default function ScannerPage() {
     if (!code.trim()) return;
     
     const extractedCode = code.trim();
+    const now = Date.now();
     
-    // Kiểm tra xem mã này đã quét chưa trong danh sách hiện tại
-    const isDuplicate = scannedCandidates.some(c => c.sbd === extractedCode);
-    
-    // Kiểm tra xem mã này đang được xử lý không (tránh gọi API liên tục khi camera quét cùng mã)
-    const isProcessing = processingCodes.has(extractedCode);
-    
-    // Nếu đã quét rồi hoặc đang xử lý thì không làm gì thêm
-    if (isDuplicate || isProcessing) {
-      console.log('Mã hiệu đã quét hoặc đang xử lý:', extractedCode);
+    // 1. LỚP 1: Chống quét trùng lặp tức thời cùng 1 mã trong vòng 3 giây
+    if (lastScannedCodeRef.current === extractedCode && now - lastScannedTimeRef.current < 3000) {
       return;
     }
     
-    // Thêm mã vào danh sách đang xử lý
-    setProcessingCodes(prev => new Set(prev).add(extractedCode));
+    // 2. LỚP 2: Chống gửi chồng chéo nhiều request API khi một lượt quét trước đang chạy
+    if (isProcessingRef.current) {
+      return;
+    }
     
-    // Chỉ gọi performQRScan mà không cập nhật unifiedInput để tránh re-render liên tục
+    // Ghi nhận lịch sử quét để kích hoạt cooldown
+    lastScannedCodeRef.current = extractedCode;
+    lastScannedTimeRef.current = now;
+    
+    // 3. LỚP 3: Sử dụng Ref để so sánh trùng lặp với danh sách thực tế (khắc phục stale closure)
+    const isDuplicate = scannedCandidatesRef.current.some(c => c.sbd === extractedCode);
+    
+    if (isDuplicate) {
+      console.log('Mã hiệu đã có trong danh sách đã quét (trùng lặp):', extractedCode);
+      return;
+    }
+    
+    // Tiến hành gọi API tìm kiếm
     performQRScan(extractedCode, true);
   };
 
@@ -201,19 +229,28 @@ export default function ScannerPage() {
     if (!code.trim()) return;
     
     setIsSearching(true);
+    if (fromCamera) {
+      isProcessingRef.current = true; // Khóa tiến trình
+    }
+
     try {
-      const response = await fetch(`/api/scanner/search?code=${encodeURIComponent(code)}&date=${selectedDate}`, {
+      // Sử dụng selectedDate từ Ref để tránh dữ liệu cũ của ngày thi
+      const currentDate = selectedDateRef.current;
+      const response = await fetch(`/api/scanner/search?code=${encodeURIComponent(code)}&date=${currentDate}`, {
         method: 'GET',
       });
       const result = await response.json();
       
       if (result.success && result.candidates && result.candidates.length > 0) {
+        // Lấy danh sách đã quét hiện tại từ Ref
+        const currentScanned = scannedCandidatesRef.current;
+
         // Kiểm tra xem có thí sinh mới không trùng với danh sách đã quét không
         const hasNewCandidates = result.candidates.some(
-          (c: Candidate) => !scannedCandidates.some(p => p.sbd === c.sbd && p.exam_date === c.exam_date)
+          (c: Candidate) => !currentScanned.some(p => p.sbd === c.sbd && p.exam_date === c.exam_date)
         );
         
-        // Chỉ kích hoạt phản hồi (rung + âm thanh) nếu có thí sinh mới
+        // Chỉ kích hoạt phản hồi (rung + âm thanh) nếu có thí sinh mới thực sự
         if (hasNewCandidates) {
           triggerSuccessFeedback();
         }
@@ -228,7 +265,7 @@ export default function ScannerPage() {
             ...newCandidates.map((c: any) => ({
               ...c,
               scannedAt: new Date(),
-              scanMethod: fromCamera ? 'qr' : 'qr',
+              scanMethod: 'qr',
             }))
           ];
         });
@@ -244,37 +281,19 @@ export default function ScannerPage() {
       }
     } finally {
       setIsSearching(false);
-      // Xóa mã khỏi danh sách đang xử lý sau khi hoàn tất (cho camera scan)
       if (fromCamera) {
-        setProcessingCodes(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(code);
-          return newSet;
-        });
+        isProcessingRef.current = false; // Mở khóa tiến trình khi kết thúc tác vụ bất đồng bộ
       }
     }
     
-    // Chỉ clear input khi không phải từ camera
+    // Chỉ dọn dẹp input khi nhập thủ công
     if (!fromCamera) {
       setUnifiedInput('');
       qrInputRef.current?.focus();
     }
-    // Nếu từ camera: không cập nhật input, giữ nguyên trạng thái để quét tiếp
   };
 
-  // Xử lý khi quét QR hoặc nhập mã hiệu (deprecated - dùng performQRScan thay thế)
-  const handleQRScan = async (code: string) => {
-    performQRScan(code, false);
-  };
-
-  // Xử lý khi nhấn Enter ở ô QR
-  const handleQRKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleQRScan(unifiedInput);
-    }
-  };
-
-  // Tìm kiếm theo tên hoặc SBD
+  // Tìm kiếm theo tên hoặc SBD khi nhập thủ công
   const handleSearch = async () => {
     if (!unifiedInput.trim()) return;
     
@@ -291,7 +310,6 @@ export default function ScannerPage() {
           (c: Candidate) => !scannedCandidates.some(p => p.sbd === c.sbd && p.exam_date === c.exam_date)
         );
         
-        // Chỉ kích hoạt phản hồi (rung + âm thanh) nếu có thí sinh mới
         if (hasNewCandidates) {
           triggerSuccessFeedback();
         }
@@ -346,7 +364,6 @@ export default function ScannerPage() {
       return;
     }
 
-    // Xác định danh sách cần xóa
     let candidatesToDelete: ScannedCandidate[] = [];
     
     if (deleteType === 'profile') {
@@ -376,7 +393,6 @@ export default function ScannerPage() {
       const result = await response.json();
       
       if (result.success) {
-        // Cập nhật lại danh sách sau khi xóa
         setScannedCandidates(prev => 
           prev.filter(c => !candidatesToDelete.some(d => d.sbd === c.sbd && d.exam_date === c.exam_date))
         );
@@ -439,7 +455,7 @@ export default function ScannerPage() {
             </CardContent>
           </Card>
 
-          {/* Tìm kiếm thống nhất: Quét QR / Mã hiệu / Tên / SBD */}
+          {/* Tìm kiếm thống nhất */}
           <Card className="md:col-span-2">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -457,7 +473,7 @@ export default function ScannerPage() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       if (searchMode === 'qr') {
-                        handleQRScan(unifiedInput);
+                        performQRScan(unifiedInput, false);
                       } else {
                         handleSearch();
                       }
@@ -489,7 +505,7 @@ export default function ScannerPage() {
                   <Button 
                     onClick={() => {
                       if (searchMode === 'qr') {
-                        handleQRScan(unifiedInput);
+                        performQRScan(unifiedInput, false);
                       } else {
                         handleSearch();
                       }
@@ -500,7 +516,6 @@ export default function ScannerPage() {
                   >
                     {isSearching ? '⏳' : searchMode === 'qr' ? <QrCode className="h-4 w-4" /> : <Search className="h-4 w-4" />}
                   </Button>
-                  {/* Nút mở camera scanner cho mobile */}
                   <Button
                     variant="outline"
                     size="icon"
@@ -587,7 +602,6 @@ export default function ScannerPage() {
                 </div>
               ) : (
                 <>
-                  {/* Action Buttons */}
                   <div className="flex flex-wrap gap-2 mb-4">
                     <Button
                       variant="destructive"
@@ -730,12 +744,12 @@ export default function ScannerPage() {
                   onChange={(e) => setUnifiedInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      handleQRScan(unifiedInput);
+                      performQRScan(unifiedInput, false);
                     }
                   }}
                 />
                 <Button 
-                  onClick={() => handleQRScan(unifiedInput)}
+                  onClick={() => performQRScan(unifiedInput, false)}
                   disabled={!unifiedInput.trim()}
                 >
                   <Search className="h-4 w-4" />
