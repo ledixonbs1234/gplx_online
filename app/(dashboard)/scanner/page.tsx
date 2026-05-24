@@ -36,6 +36,42 @@ interface ScannedCandidate extends Candidate {
 
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag-vDGsZgmH4rX_TicLtVwD-y696bgk/edit?usp=sharing';
 
+// Hàm kích hoạt phản hồi thành công (rung + âm thanh bíp)
+const triggerSuccessFeedback = () => {
+  if (typeof window === 'undefined') return;
+
+  // 1. KÍCH HOẠT RUNG (Chạy tốt trên Android)
+  if ('vibrate' in navigator) {
+    navigator.vibrate(200); // Rung ngắn trong 200ms
+  }
+
+  // 2. PHÁT TIẾNG BÍP (Chạy tốt trên cả iOS và Android)
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContextClass) {
+      const audioCtx = new AudioContextClass();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      // Cấu hình âm thanh
+      oscillator.type = 'sine';          // Loại sóng âm (sine tạo tiếng bíp mượt)
+      oscillator.frequency.value = 1200; // Tần số âm thanh (1200Hz nghe rất thanh và rõ)
+      gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime); // Âm lượng nhỏ vừa phải (8%)
+
+      // Bắt đầu phát
+      oscillator.start();
+      
+      // Tắt tiếng bíp sau 0.1 giây (100ms) để âm thanh gọn gàng
+      oscillator.stop(audioCtx.currentTime + 0.1);
+    }
+  } catch (error) {
+    console.warn('Thiết bị hoặc trình duyệt không cho phép phát âm thanh:', error);
+  }
+};
+
 export default function ScannerPage() {
   const [sheetsList, setSheetsList] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('all');
@@ -145,6 +181,9 @@ export default function ScannerPage() {
       const result = await response.json();
       
       if (result.success && result.candidates && result.candidates.length > 0) {
+        // Kích hoạt phản hồi thành công (rung + âm thanh bíp)
+        triggerSuccessFeedback();
+        
         // Thêm từng thí sinh vào danh sách đã quét (tránh trùng)
         setScannedCandidates(prev => {
           const newCandidates = result.candidates.filter(
@@ -193,6 +232,9 @@ export default function ScannerPage() {
       const result = await response.json();
       
       if (result.success && result.candidates && result.candidates.length > 0) {
+        // Kích hoạt phản hồi thành công (rung + âm thanh bíp)
+        triggerSuccessFeedback();
+        
         setScannedCandidates(prev => {
           const newCandidates = result.candidates.filter(
             (c: Candidate) => !prev.some(p => p.sbd === c.sbd && p.exam_date === c.exam_date)
@@ -231,16 +273,13 @@ export default function ScannerPage() {
   const handleCameraScanResult = (code: string) => {
     if (!code.trim()) return;
     
-    // Stop scanning after successful scan
-    if ((window as any).qrCodeScanner) {
-      (window as any).qrCodeScanner.stop().then(() => {
-        (window as any).qrCodeScanner = null;
-      }).catch(console.error);
-    }
+    // Kích hoạt phản hồi thành công ngay lập tức (rung + âm thanh bíp)
+    triggerSuccessFeedback();
     
+    // Tiếp tục quét mà không đóng camera
+    // Chỉ cập nhật input và gọi xử lý
     setUnifiedInput(code);
     handleQRScan(code);
-    setShowCameraScanner(false);
   };
 
   // Mở dialog xóa
