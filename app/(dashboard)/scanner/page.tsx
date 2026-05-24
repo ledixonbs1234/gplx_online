@@ -84,6 +84,8 @@ export default function ScannerPage() {
   const [candidateToDelete, setCandidateToDelete] = useState<ScannedCandidate | null>(null);
   const [deleteType, setDeleteType] = useState<'single' | 'profile' | 'gplx'>('single');
   const [showCameraScanner, setShowCameraScanner] = useState(false);
+  // Lưu trữ các mã đang được xử lý để tránh quét trùng liên tục
+  const [processingCodes, setProcessingCodes] = useState<Set<string>>(new Set());
   const qrInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -173,21 +175,24 @@ export default function ScannerPage() {
   const handleCameraScanResult = (code: string) => {
     if (!code.trim()) return;
     
-    // Kiểm tra trùng ngay tại đây để tránh gọi handleQRScan không cần thiết
-    // Extract code from possible formats (raw code or URL format)
     const extractedCode = code.trim();
     
     // Kiểm tra xem mã này đã quét chưa trong danh sách hiện tại
     const isDuplicate = scannedCandidates.some(c => c.sbd === extractedCode);
     
-    // Nếu đã quét rồi thì không làm gì thêm (không rung, không kêu, không cập nhật input)
-    if (isDuplicate) {
-      console.log('Mã hiệu đã quét:', extractedCode);
+    // Kiểm tra xem mã này đang được xử lý không (tránh gọi API liên tục khi camera quét cùng mã)
+    const isProcessing = processingCodes.has(extractedCode);
+    
+    // Nếu đã quét rồi hoặc đang xử lý thì không làm gì thêm
+    if (isDuplicate || isProcessing) {
+      console.log('Mã hiệu đã quét hoặc đang xử lý:', extractedCode);
       return;
     }
     
-    // Chỉ gọi handleQRScan mà không cập nhật unifiedInput để tránh re-render liên tục
-    // Pass a flag to indicate this is from camera scan
+    // Thêm mã vào danh sách đang xử lý
+    setProcessingCodes(prev => new Set(prev).add(extractedCode));
+    
+    // Chỉ gọi performQRScan mà không cập nhật unifiedInput để tránh re-render liên tục
     performQRScan(extractedCode, true);
   };
 
@@ -239,6 +244,14 @@ export default function ScannerPage() {
       }
     } finally {
       setIsSearching(false);
+      // Xóa mã khỏi danh sách đang xử lý sau khi hoàn tất (cho camera scan)
+      if (fromCamera) {
+        setProcessingCodes(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(code);
+          return newSet;
+        });
+      }
     }
     
     // Chỉ clear input khi không phải từ camera
