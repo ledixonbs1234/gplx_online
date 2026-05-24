@@ -181,8 +181,15 @@ export default function ScannerPage() {
       const result = await response.json();
       
       if (result.success && result.candidates && result.candidates.length > 0) {
-        // Kích hoạt phản hồi thành công (rung + âm thanh bíp)
-        triggerSuccessFeedback();
+        // Kiểm tra xem có thí sinh mới không trùng với danh sách đã quét không
+        const hasNewCandidates = result.candidates.some(
+          (c: Candidate) => !scannedCandidates.some(p => p.sbd === c.sbd && p.exam_date === c.exam_date)
+        );
+        
+        // Chỉ kích hoạt phản hồi (rung + âm thanh) nếu có thí sinh mới
+        if (hasNewCandidates) {
+          triggerSuccessFeedback();
+        }
         
         // Thêm từng thí sinh vào danh sách đã quét (tránh trùng)
         setScannedCandidates(prev => {
@@ -232,8 +239,15 @@ export default function ScannerPage() {
       const result = await response.json();
       
       if (result.success && result.candidates && result.candidates.length > 0) {
-        // Kích hoạt phản hồi thành công (rung + âm thanh bíp)
-        triggerSuccessFeedback();
+        // Kiểm tra xem có thí sinh mới không trùng với danh sách đã quét không
+        const hasNewCandidates = result.candidates.some(
+          (c: Candidate) => !scannedCandidates.some(p => p.sbd === c.sbd && p.exam_date === c.exam_date)
+        );
+        
+        // Chỉ kích hoạt phản hồi (rung + âm thanh) nếu có thí sinh mới
+        if (hasNewCandidates) {
+          triggerSuccessFeedback();
+        }
         
         setScannedCandidates(prev => {
           const newCandidates = result.candidates.filter(
@@ -273,8 +287,9 @@ export default function ScannerPage() {
   const handleCameraScanResult = (code: string) => {
     if (!code.trim()) return;
     
-    // Kích hoạt phản hồi thành công ngay lập tức (rung + âm thanh bíp)
-    triggerSuccessFeedback();
+    // Kiểm tra xem mã này đã quét chưa (để không kêu/rung lại)
+    // Lưu ý: Chúng ta cần kiểm tra trước khi gọi handleQRScan
+    // Vì handleQRScan sẽ tự kiểm tra và kích hoạt phản hồi nếu có dữ liệu mới
     
     // Tiếp tục quét mà không đóng camera
     // Chỉ cập nhật input và gọi xử lý
