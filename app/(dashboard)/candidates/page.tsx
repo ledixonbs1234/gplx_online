@@ -1,3 +1,4 @@
+// plx_online/app/(dashboard)/candidates/page.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarIcon, Users, FileSpreadsheet, Search, Plus, ExternalLink, Upload, CheckCircle2, AlertCircle, Download } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, FileSpreadsheet, Search, ExternalLink, Upload, CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -37,6 +38,37 @@ interface ExcelRow {
 
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag-vDGsZgmH4rX_TicLtVwD-y696bgk/edit?usp=sharing';
 
+/**
+ * Tách chuỗi người nhận ở cột E thành SBD, Họ Tên, Ngày Sinh
+ */
+function parseRecipient(text: string) {
+  const cleaned = text.trim();
+  if (!cleaned) return { sbd: '', name: '', dob: '' };
+
+  const parts = cleaned.split(/\s+/);
+  let sbd = '';
+  let dob = '';
+  let nameParts = [...parts];
+
+  // Kiểm tra nếu phần đầu tiên là chữ số (Số báo danh)
+  if (/^\d+$/.test(parts[0])) {
+    sbd = parts[0];
+    nameParts.shift();
+  }
+
+  // Kiểm tra nếu phần cuối cùng là ngày sinh (định dạng d/m/y, d-m-y hoặc serial 5 chữ số của Excel)
+  if (nameParts.length > 0) {
+    const lastToken = nameParts[nameParts.length - 1];
+    if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(lastToken) || /^\d{5}$/.test(lastToken)) {
+      dob = lastToken;
+      nameParts.pop();
+    }
+  }
+
+  const name = nameParts.join(' ').trim();
+  return { sbd, name, dob };
+}
+
 export default function CandidatesPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -44,31 +76,33 @@ export default function CandidatesPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [sheetsList, setSheetsList] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Trạng thái cập nhật mã hiệu
   const [isUpdatingCode, setIsUpdatingCode] = useState(false);
-  const [updateResult, setUpdateResult] = useState<{ success: boolean; message: string; updatedCount?: number; notFoundCount?: number } | null>(null);
+  const [updateResult, setUpdateResult] = useState<{ success: boolean; message: string; updatedCount?: number } | null>(null);
+  const [conflicts, setConflicts] = useState<any[]>([]);
+  const [unmatched, setUnmatched] = useState<any[]>([]);
+  const [isResolvingConflict, setIsResolvingConflict] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isExportingPending, setIsExportingPending] = useState(false);
 
-  // Helper chuyển đổi định dạng chuỗi ngày (dd-MM-yyyy hoặc yyyy-MM-dd) sang Object Date
   const parseSheetDate = (sheetName: string): Date => {
     const parts = sheetName.split('-');
     if (parts.length === 3) {
       if (parts[0].length === 4) {
-        // yyyy-MM-dd
         return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
       } else {
-        // dd-MM-yyyy
         return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
       }
     }
     return new Date(sheetName);
   };
 
-  // Load danh sách sheets khi mount
   useEffect(() => {
     const loadSheets = async () => {
       try {
-       const response = await fetch('/api/sheets/sync?type=list');
+        const response = await fetch('/api/sheets/sync?type=list');
         const result = await response.json();
         if (result.success) {
           setSheetsList(result.sheets || []);
@@ -80,39 +114,36 @@ export default function CandidatesPage() {
     loadSheets();
   }, []);
 
-  // Load dữ liệu học viên theo ngày thi (sử dụng dd-MM-yyyy)
-  useEffect(() => {
-    const loadCandidates = async () => {
-      if (!selectedDate) return;
-      
-      setIsLoading(true);
-      try {
-        const dateStr = format(selectedDate, 'dd-MM-yyyy'); // Sử dụng chuẩn dd-MM-yyyy
-        const response = await fetch(`/api/sheets/data?date=${dateStr}`);
-        const result = await response.json();
-        if (result.success) {
-          setCandidates(result.candidates || []);
-        } else {
-          setCandidates([]);
-        }
-      } catch (error) {
-        console.error('Error loading candidates:', error);
-        setCandidates([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadCandidates = async () => {
+    if (!selectedDate) return;
     
+    setIsLoading(true);
+    try {
+      const dateStr = format(selectedDate, 'dd-MM-yyyy');
+      const response = await fetch(`/api/sheets/data?date=${dateStr}`);
+      const result = await response.json();
+      if (result.success) {
+        setCandidates(result.candidates || []);
+      } else {
+        setCandidates([]);
+      }
+    } catch (error) {
+      console.error('Error loading candidates:', error);
+      setCandidates([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadCandidates();
   }, [selectedDate]);
 
-  // Lọc học viên theo tìm kiếm
   const filteredCandidates = candidates.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.sbd.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Thống kê
   const stats = {
     total: filteredCandidates.length,
     passed: filteredCandidates.filter(c => c.exam_status === 'Pass').length,
@@ -122,78 +153,55 @@ export default function CandidatesPage() {
     returnedGPLX: filteredCandidates.filter(c => c.gplx_status === 'Returned').length,
   };
 
-  // Xử lý cập nhật mã hiệu từ file Excel
   const handleUpdateCode = async (file: File) => {
-    if (!selectedDate) {
-      setUpdateResult({ success: false, message: 'Vui lòng chọn ngày thi trước' });
-      return;
-    }
-
     setIsUpdatingCode(true);
     setUpdateResult(null);
+    setConflicts([]);
+    setUnmatched([]);
 
     try {
       const arrayBuffer = await file.arrayBuffer();
       const XLSX = await import('xlsx');
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       
-      // Lấy sheet đầu tiên
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      
-      // Chuyển thành JSON với header là số hàng
       const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       
-      // Parse dữ liệu từ hàng 4 trở đi (index 3)
       const excelData: ExcelRow[] = [];
-      for (let i = 3; i < rawData.length; i++) {
+      // Đọc từ Hàng 3 trở đi (index 2)
+      for (let i = 2; i < rawData.length; i++) {
         const row = rawData[i];
         if (!row || row.length === 0) continue;
         
-        // Cột F (index 5) là mã hiệu
-        const code = row[5] ? String(row[5]).trim() : '';
+        // Cột E (index 4) là người nhận
+        const recipientVal = row[4] ? String(row[4]).trim() : '';
+        if (!recipientVal) continue;
+
+        // Cột M (index 12) là số hiệu BG / Mã hiệu
+        const code = row[12] ? String(row[12]).trim() : '';
         
-        // Cột H (index 7) có nội dung "1 TRẦN VĂN AN 01/02/1980"
-        const colHContent = row[7] ? String(row[7]).trim() : '';
-        
-        if (!colHContent) continue;
-        
-        // Parse nội dung cột H: "1 TRẦN VĂN AN 01/02/1980"
-        const parts = colHContent.split(/\s+/);
-        const sbd = parts[0] || '';
-        
-        // Ngày sinh là phần cuối cùng (dd/mm/yyyy)
-        const dateOfBirth = parts[parts.length - 1] || '';
-        
-        // Tên là phần ở giữa (từ index 1 đến length-2)
-        const nameParts = parts.slice(1, parts.length - 1);
-        const fullName = nameParts.join(' ') || '';
-        
-        if (sbd && fullName) {
+        const parsed = parseRecipient(recipientVal);
+        if (parsed.name || parsed.sbd) {
           excelData.push({
-            sbd,
-            fullName,
-            dateOfBirth,
+            sbd: parsed.sbd,
+            fullName: parsed.name,
+            dateOfBirth: parsed.dob,
             code,
           });
         }
       }
 
       if (excelData.length === 0) {
-        setUpdateResult({ success: false, message: 'Không tìm thấy dữ liệu trong file Excel' });
+        setUpdateResult({ success: false, message: 'Không tìm thấy dữ liệu khả dụng từ hàng 3 trở đi trong file Excel' });
         setIsUpdatingCode(false);
         return;
       }
 
-      // Gọi API để cập nhật (Sử dụng chuẩn dd-MM-yyyy)
-      const examDate = format(selectedDate, 'dd-MM-yyyy');
       const response = await fetch('/api/sheets/update-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          examDate,
-          excelData,
-        }),
+        body: JSON.stringify({ excelData }),
       });
 
       const result = await response.json();
@@ -201,25 +209,53 @@ export default function CandidatesPage() {
       if (result.success) {
         setUpdateResult({
           success: true,
-          message: result.message,
-          updatedCount: result.updatedCount,
-          notFoundCount: result.notFoundCount,
+          message: `Xử lý hoàn tất! Đã cập nhật tự động thành công cho ${result.autoUpdatedCount} học viên khớp duy nhất.`,
+          updatedCount: result.autoUpdatedCount,
         });
         
-        // Reload dữ liệu sau khi cập nhật
-        const refreshResponse = await fetch(`/api/sheets/data?date=${examDate}`);
-        const refreshResult = await refreshResponse.json();
-        if (refreshResult.success) {
-          setCandidates(refreshResult.candidates || []);
-        }
+        setConflicts(result.conflicts || []);
+        setUnmatched(result.unmatched || []);
+        
+        await loadCandidates();
       } else {
-        setUpdateResult({ success: false, message: result.error });
+        setUpdateResult({ success: false, message: result.error || 'Xảy ra lỗi trong lúc phân tích dữ liệu bưu điện' });
       }
     } catch (error: any) {
-      console.error('Error updating code:', error);
-      setUpdateResult({ success: false, message: error.message || 'Có lỗi xảy ra khi cập nhật' });
+      console.error('Lỗi tải dữ liệu Excel:', error);
+      setUpdateResult({ success: false, message: error.message || 'Lỗi đối chiếu hệ thống' });
     } finally {
       setIsUpdatingCode(false);
+    }
+  };
+
+  const handleResolveConflict = async (sheetName: string, sbd: string, code: string, conflictIndex: number) => {
+    const resolveId = `${conflictIndex}-${sheetName}`;
+    setIsResolvingConflict(resolveId);
+    try {
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'resolve_conflict',
+          sheetName,
+          sbd,
+          code,
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        alert(result.message);
+        // Loại bỏ dòng đã chọn thành công ra khỏi màn hình
+        setConflicts(prev => prev.filter((_, idx) => idx !== conflictIndex));
+        await loadCandidates();
+      } else {
+        alert(`Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Không thể thực hiện lưu mã hiệu bưu điện');
+    } finally {
+      setIsResolvingConflict(null);
     }
   };
 
@@ -230,22 +266,19 @@ export default function CandidatesPage() {
     }
   };
 
-  // Xử lý xuất Excel danh sách GPLX trạng thái Chờ
   const handleExportPendingGPLX = async () => {
     if (!selectedDate) return;
 
     setIsExportingPending(true);
     try {
-      // Lọc danh sách học viên có gplx_status = 'Pending' (Chờ)
       const pendingCandidates = candidates.filter(c => c.gplx_status === 'Pending');
 
       if (pendingCandidates.length === 0) {
-        alert('Không có học viên nào có trạng thái GPLX "Chờ" cho ngày này.');
+        alert('Không có học viên nào ở trạng thái Chờ nhận GPLX cho ngày này.');
         setIsExportingPending(false);
         return;
       }
 
-      // Tạo dữ liệu Excel
       const excelData = [
         ['SBD', 'Họ Tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Kết Quả', 'Đã Nộp Tiền', 'Trạng Thái GPLX'],
         ...pendingCandidates.map((c) => [
@@ -261,40 +294,27 @@ export default function CandidatesPage() {
         ]),
       ];
 
-      // Sử dụng xlsx để tạo file Excel
       const XLSX = await import('xlsx');
       const worksheet = XLSX.utils.aoa_to_sheet(excelData);
       
-      // Đặt độ rộng cột
       worksheet['!cols'] = [
-        { wch: 12 },  // SBD
-        { wch: 30 },  // Họ tên
-        { wch: 15 },  // Ngày sinh
-        { wch: 15 },  // Số điện thoại
-        { wch: 25 },  // Nơi nhận
-        { wch: 20 },  // Mã vận đơn
-        { wch: 12 },  // Kết quả
-        { wch: 15 },  // Đã nộp tiền
-        { wch: 18 },  // Trạng thái GPLX
+        { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 18 }
       ];
 
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Danh sách chưa có GPLX');
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Chưa GPLX');
 
-      // Xuất file
       const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
       const data = new Blob([excelBuffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
 
-      // Tạo tên file: Danh Sách Chưa Có GPLX ngày dd-MM-yyyy
       const fileName = `Danh Sách Chưa Có GPLX ngày ${format(selectedDate, 'dd-MM-yyyy')}.xlsx`;
-      
       const { saveAs } = await import('file-saver');
       saveAs(data, fileName);
     } catch (error: any) {
-      console.error('Error exporting pending GPLX:', error);
-      alert('Có lỗi xảy ra khi xuất file Excel: ' + (error.message || 'Lỗi không xác định'));
+      console.error('Error exporting:', error);
+      alert('Có lỗi xảy ra: ' + (error.message || 'Lỗi không xác định'));
     } finally {
       setIsExportingPending(false);
     }
@@ -309,17 +329,12 @@ export default function CandidatesPage() {
 
       <div className="p-4 lg:p-8 space-y-6">
         {/* Controls */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-4"
-        >
-          {/* Chọn ngày thi */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <CalendarIcon className="h-4 w-4" />
-                Chọn ngày thi
+                Chọn ngày thi hiển thị
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -345,7 +360,6 @@ export default function CandidatesPage() {
             </CardContent>
           </Card>
 
-          {/* Tìm kiếm */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -363,7 +377,6 @@ export default function CandidatesPage() {
             </CardContent>
           </Card>
 
-          {/* Mở Google Sheets */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -383,245 +396,249 @@ export default function CandidatesPage() {
               </a>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
 
-        {/* Cập nhật mã hiệu từ Excel */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-        >
-          <Card className="border-blue-200 bg-blue-50/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2 text-blue-700">
-                <Upload className="h-4 w-4" />
-                Cập nhật Mã Hiệu từ Excel
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                Chọn file Excel có cấu trúc: hàng 4 trở đi, cột F là mã hiệu, cột H có nội dung "SBD Họ Tên Ngày Sinh"
-              </p>
-              <div className="flex gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  disabled={!selectedDate || isUpdatingCode}
-                />
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={!selectedDate || isUpdatingCode}
-                  className="flex-1"
-                >
-                  {isUpdatingCode ? (
-                    <>
-                      <span className="animate-spin mr-2">⏳</span>
-                      Đang xử lý...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Chọn file Excel
-                    </>
-                  )}
-                </Button>
+        {/* Nút Upload Cập Nhật Mã Hiệu bưu điện */}
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-blue-700">
+              <Upload className="h-4 w-4" />
+              Cập nhật Mã Hiệu bưu điện từ Excel (Đối chiếu toàn bộ hệ thống)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Dữ liệu Excel hợp lệ: Bắt đầu từ **Hàng 3**, cột **E (Tên người nhận)** chứa thông tin học viên (Hỗ trợ tự động bóc tách SBD, Tên, Ngày Sinh), cột **M (Số hiệu BG)** là mã hiệu cần lấy.
+            </p>
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileSelect}
+                className="hidden"
+                disabled={isUpdatingCode}
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUpdatingCode}
+                className="flex-1"
+              >
+                {isUpdatingCode ? 'Đang phân tích và đối chiếu toàn bộ các sheets...' : 'Chọn file Excel bưu điện'}
+              </Button>
+            </div>
+            
+            {updateResult && (
+              <div className={`p-3 rounded-md flex items-start gap-2 ${updateResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {updateResult.success ? <CheckCircle2 className="h-5 w-5 flex-shrink-0" /> : <AlertCircle className="h-5 w-5 flex-shrink-0" />}
+                <p className="text-sm font-medium">{updateResult.message}</p>
               </div>
-              
-              {updateResult && (
-                <div className={`p-3 rounded-md flex items-start gap-2 ${
-                  updateResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
-                  {updateResult.success ? (
-                    <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                  )}
-                  <div className="text-sm">
-                    <p className="font-medium">{updateResult.message}</p>
-                    {updateResult.updatedCount !== undefined && (
-                      <p className="text-xs mt-1">
-                        ✓ Đã cập nhật: <strong>{updateResult.updatedCount}</strong> thí sinh
-                        {updateResult.notFoundCount !== undefined && updateResult.notFoundCount > 0 && (
-                          <span className="text-orange-600"> | Không tìm thấy: {updateResult.notFoundCount}</span>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
+            )}
+          </CardContent>
+        </Card>
+
+        {/* BẢNG XỬ LÝ TRÙNG LẶP NHIỀU NGÀY THI (CONFLICTS) */}
+        {conflicts.length > 0 && (
+          <Card className="border-amber-200 bg-amber-50/50">
+            <CardHeader>
+              <CardTitle className="text-amber-800 text-base font-bold flex items-center gap-2">
+                ⚠️ Phát hiện trùng khớp thông tin trên nhiều ngày thi ({conflicts.length})
+              </CardTitle>
+              <p className="text-xs text-amber-700">
+                Nhấn chọn chính xác ngày thi thích hợp dưới đây để ghi đè mã hiệu bưu điện tương ứng:
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-amber-100 text-amber-900 sticky top-0">
+                    <tr className="text-left">
+                      <th className="py-2 px-3">SBD</th>
+                      <th className="py-2 px-3">Họ Tên</th>
+                      <th className="py-2 px-3">Ngày Sinh</th>
+                      <th className="py-2 px-3">Mã Hiệu (Cột M)</th>
+                      <th className="py-2 px-3 text-center">Ghi nhận vào ngày thi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {conflicts.map((conflict, idx) => (
+                      <tr key={idx} className="border-b border-amber-200 hover:bg-amber-100/50">
+                        <td className="py-2 px-3 font-mono">{conflict.excelRow.sbd || '-'}</td>
+                        <td className="py-2 px-3 font-medium">{conflict.excelRow.fullName}</td>
+                        <td className="py-2 px-3">{conflict.excelRow.dateOfBirth || '-'}</td>
+                        <td className="py-2 px-3 font-mono">{conflict.excelRow.code || '-'}</td>
+                        <td className="py-2 px-3 flex flex-wrap gap-1.5 justify-center">
+                          {conflict.matches.map((match: any) => {
+                            const resolveId = `${idx}-${match.sheetName}`;
+                            return (
+                              <Button
+                                key={match.sheetName}
+                                size="sm"
+                                variant="outline"
+                                className="bg-white border-amber-300 hover:bg-amber-200 hover:text-amber-900 font-semibold"
+                                onClick={() => handleResolveConflict(match.sheetName, match.sbd, conflict.excelRow.code, idx)}
+                                disabled={isResolvingConflict === resolveId}
+                              >
+                                {isResolvingConflict === resolveId ? '⏳...' : `📅 ${match.sheetName}`}
+                              </Button>
+                            );
+                          })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
-        </motion.div>
+        )}
 
-        {/* Danh sách sheets có sẵn */}
+        {/* BẢNG DANH SÁCH KHÔNG TÌM THẤY HỌC VIÊN (UNMATCHED) */}
+        {unmatched.length > 0 && (
+          <Card className="border-red-200 bg-red-50/50">
+            <CardHeader>
+              <CardTitle className="text-red-800 text-base font-bold flex items-center gap-2">
+                ❌ Thí sinh tải lên không tìm thấy trong cơ sở dữ liệu ({unmatched.length})
+              </CardTitle>
+              <p className="text-xs text-red-700">
+                Các thí sinh này không khớp bất kỳ thông tin nào trong toàn bộ lịch sử các ngày thi:
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-red-100 text-red-900 sticky top-0">
+                    <tr className="text-left">
+                      <th className="py-2 px-3">SBD</th>
+                      <th className="py-2 px-3">Họ Tên</th>
+                      <th className="py-2 px-3">Ngày Sinh</th>
+                      <th className="py-2 px-3">Mã Hiệu (Cột M)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unmatched.map((row, idx) => (
+                      <tr key={idx} className="border-b border-red-200 hover:bg-red-100/30">
+                        <td className="py-2 px-3 font-mono">{row.sbd || '-'}</td>
+                        <td className="py-2 px-3 font-medium">{row.fullName}</td>
+                        <td className="py-2 px-3">{row.dateOfBirth || '-'}</td>
+                        <td className="py-2 px-3 font-mono">{row.code || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Ngày thi có dữ liệu */}
         {sheetsList.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">
-                  📋 Các ngày thi có dữ liệu ({sheetsList.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {sheetsList.map((sheet) => (
-                    <Badge
-                      key={sheet}
-                      variant={
-                        selectedDate &&
-                        (format(selectedDate, 'dd-MM-yyyy') === sheet ||
-                          format(selectedDate, 'yyyy-MM-dd') === sheet)
-                          ? 'default'
-                          : 'secondary'
-                      }
-                      className="cursor-pointer"
-                      onClick={() => setSelectedDate(parseSheetDate(sheet))}
-                    >
-                      📅 {sheet}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">📋 Các ngày thi có dữ liệu ({sheetsList.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {sheetsList.map((sheet) => (
+                  <Badge
+                    key={sheet}
+                    variant={selectedDate && (format(selectedDate, 'dd-MM-yyyy') === sheet || format(selectedDate, 'yyyy-MM-dd') === sheet) ? 'default' : 'secondary'}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedDate(parseSheetDate(sheet))}
+                  >
+                    📅 {sheet}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Thống kê nhanh */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="grid grid-cols-2 lg:grid-cols-6 gap-4"
-        >
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
           <StatCard label="Tổng HV" value={stats.total} color="from-blue-500 to-cyan-500" />
           <StatCard label="Đậu" value={stats.passed} color="from-emerald-500 to-teal-500" />
           <StatCard label="Rớt" value={stats.failed} color="from-red-500 to-orange-500" />
           <StatCard label="Chưa thi" value={stats.notTested} color="from-amber-500 to-yellow-500" />
           <StatCard label="Có hồ sơ" value={stats.hasProfile} color="from-purple-500 to-pink-500" />
           <StatCard label="Đã nhận GPLX" value={stats.returnedGPLX} color="from-indigo-500 to-violet-500" />
-        </motion.div>
+        </div>
 
-        {/* Bảng học viên */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Danh sách học viên
-                  {selectedDate && (
-                    <Badge variant="secondary">
-                      {format(selectedDate, 'dd/MM/yyyy', { locale: vi })}
-                    </Badge>
-                  )}
-                </span>
-                <div className="flex items-center gap-2">
-                  {isLoading && <span className="text-sm text-muted-foreground">Đang tải...</span>}
-                  {/* Button xuất Excel danh sách GPLX trạng thái Chờ */}
-                  {selectedDate && (
-                    <Button
-                      onClick={handleExportPendingGPLX}
-                      disabled={isExportingPending || filteredCandidates.length === 0}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {isExportingPending ? (
-                        <>
-                          <span className="animate-spin mr-2">⏳</span>
-                          Đang xuất...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="mr-2 h-4 w-4" />
-                          Xuất Excel GPLX Chờ
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {filteredCandidates.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    {isLoading ? 'Đang tải dữ liệu...' : 'Không có học viên nào cho ngày này'}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Hãy chọn ngày khác hoặc thêm dữ liệu vào Google Sheets
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-semibold">SBD</th>
-                        <th className="text-left py-3 px-4 font-semibold">Họ tên</th>
-                        <th className="text-left py-3 px-4 font-semibold">Ngày Sinh</th>
-                        <th className="text-left py-3 px-4 font-semibold">Số Điện Thoại</th>
-                        <th className="text-left py-3 px-4 font-semibold">Nơi Nhận</th>
-                        <th className="text-left py-3 px-4 font-semibold">Mã Vận Đơn</th>
-                        <th className="text-center py-3 px-4 font-semibold">Hồ sơ</th>
-                        <th className="text-center py-3 px-4 font-semibold">Kết quả</th>
-                        <th className="text-center py-3 px-4 font-semibold">Đã Nộp Tiền</th>
-                        <th className="text-center py-3 px-4 font-semibold">GPLX</th>
-                        <th className="text-center py-3 px-4 font-semibold">Postal</th>
+        {/* Danh sách học viên */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Danh sách học viên hiển thị
+                {selectedDate && <Badge variant="secondary">{format(selectedDate, 'dd/MM/yyyy', { locale: vi })}</Badge>}
+              </span>
+              <div className="flex items-center gap-2">
+                {isLoading && <span className="text-sm text-muted-foreground">Đang tải...</span>}
+                {selectedDate && (
+                  <Button onClick={handleExportPendingGPLX} disabled={isExportingPending || filteredCandidates.length === 0} size="sm" variant="outline">
+                    {isExportingPending ? 'Đang xuất...' : 'Xuất Excel GPLX Chờ'}
+                  </Button>
+                )}
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filteredCandidates.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">{isLoading ? 'Đang tải dữ liệu...' : 'Không có học viên nào cho ngày này'}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="py-3 px-4 font-semibold">SBD</th>
+                      <th className="py-3 px-4 font-semibold">Họ tên</th>
+                      <th className="py-3 px-4 font-semibold">Ngày Sinh</th>
+                      <th className="py-3 px-4 font-semibold">Số Điện Thoại</th>
+                      <th className="py-3 px-4 font-semibold">Nơi Nhận</th>
+                      <th className="py-3 px-4 font-semibold">Mã Vận Đơn</th>
+                      <th className="text-center py-3 px-4 font-semibold">Hồ sơ</th>
+                      <th className="text-center py-3 px-4 font-semibold">Kết quả</th>
+                      <th className="text-center py-3 px-4 font-semibold">Đã Nộp Tiền</th>
+                      <th className="text-center py-3 px-4 font-semibold">GPLX</th>
+                      <th className="text-center py-3 px-4 font-semibold">Postal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCandidates.map((candidate) => (
+                      <tr key={candidate.sbd} className="border-b hover:bg-muted/50">
+                        <td className="py-3 px-4 font-mono text-sm">{candidate.sbd}</td>
+                        <td className="py-3 px-4 font-medium">{candidate.name}</td>
+                        <td className="py-3 px-4 text-sm">{candidate.date_of_birth || '-'}</td>
+                        <td className="py-3 px-4 text-sm">{candidate.phone || '-'}</td>
+                        <td className="py-3 px-4 text-sm">{candidate.receive_location || '-'}</td>
+                        <td className="py-3 px-4 font-mono text-xs">{candidate.tracking_number || '-'}</td>
+                        <td className="text-center py-3 px-4">
+                          <Badge variant={candidate.has_profile ? 'default' : 'secondary'}>{candidate.has_profile ? '✓' : '✗'}</Badge>
+                        </td>
+                        <td className="text-center py-3 px-4">
+                          <StatusBadge status={candidate.exam_status} />
+                        </td>
+                        <td className="text-center py-3 px-4">
+                          <Badge variant={candidate.has_app_and_fee ? 'default' : 'secondary'}>{candidate.has_app_and_fee ? '✓' : '✗'}</Badge>
+                        </td>
+                        <td className="text-center py-3 px-4">
+                          <Badge variant={candidate.gplx_status === 'Returned' ? 'default' : 'secondary'}>{candidate.gplx_status === 'Returned' ? 'Đã về' : 'Chờ'}</Badge>
+                        </td>
+                        <td className="text-center py-3 px-4">
+                          <Badge variant={candidate.has_postal_up ? 'default' : 'secondary'}>{candidate.has_postal_up ? '✓' : '✗'}</Badge>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {filteredCandidates.map((candidate) => (
-                        <tr key={candidate.sbd} className="border-b hover:bg-muted/50">
-                          <td className="py-3 px-4 font-mono text-sm">{candidate.sbd}</td>
-                          <td className="py-3 px-4 font-medium">{candidate.name}</td>
-                          <td className="py-3 px-4 text-sm">{candidate.date_of_birth || '-'}</td>
-                          <td className="py-3 px-4 text-sm">{candidate.phone || '-'}</td>
-                          <td className="py-3 px-4 text-sm">{candidate.receive_location || '-'}</td>
-                          <td className="py-3 px-4 font-mono text-xs">{candidate.tracking_number || '-'}</td>
-                          <td className="text-center py-3 px-4">
-                            <Badge variant={candidate.has_profile ? 'default' : 'secondary'}>
-                              {candidate.has_profile ? '✓' : '✗'}
-                            </Badge>
-                          </td>
-                          <td className="text-center py-3 px-4">
-                            <StatusBadge status={candidate.exam_status} />
-                          </td>
-                          <td className="text-center py-3 px-4">
-                            <Badge variant={candidate.has_app_and_fee ? 'default' : 'secondary'}>
-                              {candidate.has_app_and_fee ? '✓' : '✗'}
-                            </Badge>
-                          </td>
-                          <td className="text-center py-3 px-4">
-                            <Badge variant={candidate.gplx_status === 'Returned' ? 'default' : 'secondary'}>
-                              {candidate.gplx_status === 'Returned' ? 'Đã về' : 'Chờ'}
-                            </Badge>
-                          </td>
-                          <td className="text-center py-3 px-4">
-                            <Badge variant={candidate.has_postal_up ? 'default' : 'secondary'}>
-                              {candidate.has_postal_up ? '✓' : '✗'}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </>
   );
@@ -642,10 +659,5 @@ function StatusBadge({ status }: { status: 'Pass' | 'Fail' | 'Not_Tested' }) {
     Fail: { color: 'bg-red-500', label: 'Rớt' },
     Not_Tested: { color: 'bg-gray-500', label: 'Chưa thi' },
   };
-  
-  return (
-    <Badge className={`${config[status].color} text-white`}>
-      {config[status].label}
-    </Badge>
-  );
+  return <Badge className={`${config[status].color} text-white`}>{config[status].label}</Badge>;
 }

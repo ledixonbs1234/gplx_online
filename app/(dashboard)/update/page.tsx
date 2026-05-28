@@ -1,7 +1,7 @@
 // plx_online/app/(dashboard)/update/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react'; // Bổ sung useRef tại đây
 import { motion } from 'framer-motion';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,9 @@ export default function DirectUpdatePage() {
 
   // Thông báo kết quả lưu nhanh
   const [message, setMessage] = useState<{ type: 'success' | 'error' | null; content: string }>({ type: null, content: '' });
+
+  // Khai báo ref cho ô nhập số điện thoại
+  const phoneInputRef = useRef<HTMLInputElement>(null);
 
   // Tải danh sách ngày thi và khôi phục trạng thái ngày chọn trước đó từ localStorage
   useEffect(() => {
@@ -124,6 +127,14 @@ export default function DirectUpdatePage() {
       setMDiaChi(found.residence || found.receive_location || '');
       setSearchStatus('found');
       setMessage({ type: null, content: '' });
+
+      // Đợi React cập nhật state để xóa thuộc tính 'disabled' của ô SĐT, sau đó focus và bôi đen
+      setTimeout(() => {
+        if (phoneInputRef.current) {
+          phoneInputRef.current.focus();
+          phoneInputRef.current.select(); // Tiện ích giúp người dùng sửa nhanh SĐT cũ nếu có
+        }
+      }, 50);
     } else {
       setMHoTen('Không tìm thấy hoặc đã cập nhật');
       setMNgaySinh('');
@@ -212,6 +223,14 @@ export default function DirectUpdatePage() {
     setMDiaChi(candidate.residence || '');
     setSearchStatus('found');
     setMessage({ type: null, content: '' });
+
+    // Focus vào ô SĐT khi người dùng chọn sửa lại thí sinh trong danh sách lịch sử
+    setTimeout(() => {
+      if (phoneInputRef.current) {
+        phoneInputRef.current.focus();
+        phoneInputRef.current.select();
+      }
+    }, 50);
   };
 
   return (
@@ -331,6 +350,7 @@ export default function DirectUpdatePage() {
                   <div className="space-y-2">
                     <label className="text-base font-bold text-neutral-800 dark:text-neutral-200">Số Điện Thoại</label>
                     <input
+                      ref={phoneInputRef} // Gán ref tại đây để hỗ trợ focus tự động
                       type="tel"
                       value={mSdt}
                       onChange={(e) => setMSdt(e.target.value)}
