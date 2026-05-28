@@ -1,3 +1,4 @@
+// plx_online/components/CandidateTable.tsx
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,22 +13,21 @@ interface CandidateTableProps {
   candidates: Candidate[];
 }
 
-type FilterCategory = 'all' | 'no_profile' | 'fail' | 'pass_with_app_postal' | 
+type FilterCategory = 'all' | 'no_profile' | 'fail' | 'pass_with_app_returned' | 
                      'pass_with_app_pending' | 'pass_no_fee_returned' | 'pass_no_fee_pending';
 
 export function CandidateTable({ candidates }: CandidateTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
 
-  // Phân loại ứng viên theo decision tree
   const categorizeCandidate = (candidate: Candidate): FilterCategory => {
     if (!candidate.has_profile) return 'no_profile';
     if (candidate.exam_status === 'Fail') return 'fail';
     
     if (candidate.exam_status === 'Pass') {
       if (candidate.has_app_and_fee) {
-        if (candidate.gplx_status === 'Returned' && candidate.has_postal_up) {
-          return 'pass_with_app_postal';
+        if (candidate.gplx_status === 'Returned') {
+          return 'pass_with_app_returned';
         }
         return 'pass_with_app_pending';
       } else {
@@ -55,7 +55,7 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
       all: candidates.length,
       no_profile: 0,
       fail: 0,
-      pass_with_app_postal: 0,
+      pass_with_app_returned: 0,
       pass_with_app_pending: 0,
       pass_no_fee_returned: 0,
       pass_no_fee_pending: 0,
@@ -75,10 +75,10 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
     { key: 'all', label: 'Tất cả', color: 'bg-gray-100' },
     { key: 'no_profile', label: '❌ Không hồ sơ', color: 'bg-red-100' },
     { key: 'fail', label: '🚫 Rớt', color: 'bg-orange-100' },
-    { key: 'pass_with_app_postal', label: '✅ App + Postal', color: 'bg-green-100' },
-    { key: 'pass_with_app_pending', label: '⏳ App - Chờ GPLX', color: 'bg-yellow-100' },
-    { key: 'pass_no_fee_returned', label: '💸 Chưa Nộp - Có GPLX', color: 'bg-blue-100' },
-    { key: 'pass_no_fee_pending', label: '⏸️ Chưa Nộp - Chờ', color: 'bg-purple-100' },
+    { key: 'pass_with_app_returned', label: '✅ Đã nộp + Có GPLX', color: 'bg-green-100' },
+    { key: 'pass_with_app_pending', label: '⏳ Đã nộp - Chờ GPLX', color: 'bg-yellow-100' },
+    { key: 'pass_no_fee_returned', label: '💸 Chưa nộp - Có GPLX', color: 'bg-blue-100' },
+    { key: 'pass_no_fee_pending', label: '⏸️ Chưa nộp - Chờ GPLX', color: 'bg-purple-100' },
   ];
 
   const getStatusBadge = (candidate: Candidate) => {
@@ -86,10 +86,10 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
     const config = {
       no_profile: { label: 'Không hồ sơ', variant: 'destructive' as const },
       fail: { label: 'Rớt', variant: 'destructive' as const },
-      pass_with_app_postal: { label: 'Đã up postal', variant: 'default' as const },
+      pass_with_app_returned: { label: 'Đã nộp + Có GPLX', variant: 'default' as const },
       pass_with_app_pending: { label: 'Chờ GPLX', variant: 'secondary' as const },
-      pass_no_fee_returned: { label: 'Chưa Nộp - GPLX về', variant: 'outline' as const },
-      pass_no_fee_pending: { label: 'Chưa Nộp - Chờ', variant: 'secondary' as const },
+      pass_no_fee_returned: { label: 'Chưa nộp - Có GPLX', variant: 'outline' as const },
+      pass_no_fee_pending: { label: 'Chưa nộp - Chờ', variant: 'secondary' as const },
       all: { label: 'N/A', variant: 'outline' as const },
     };
     return config[category];
@@ -104,7 +104,6 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Thanh tìm kiếm */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -125,7 +124,6 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
           )}
         </div>
 
-        {/* Nút lọc nhanh */}
         <div className="flex flex-wrap gap-2">
           {filterButtons.map((button) => (
             <Button
@@ -140,7 +138,6 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
           ))}
         </div>
 
-        {/* Bảng dữ liệu */}
         <div className="overflow-x-auto border rounded-lg">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
@@ -150,6 +147,7 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
                 <th className="px-4 py-2 text-left">Ngày Sinh</th>
                 <th className="px-4 py-2 text-left">Số Điện Thoại</th>
                 <th className="px-4 py-2 text-left">Nơi Nhận</th>
+                <th className="px-4 py-2 text-left">Nơi cư trú</th>
                 <th className="px-4 py-2 text-left">Mã Vận Đơn</th>
                 <th className="px-4 py-2 text-left">Ngày thi</th>
                 <th className="px-4 py-2 text-left">Hồ sơ</th>
@@ -162,7 +160,7 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
             <tbody>
               {filteredCandidates.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="text-center py-8 text-muted-foreground">
+                  <td colSpan={13} className="text-center py-8 text-muted-foreground">
                     Không có dữ liệu phù hợp
                   </td>
                 </tr>
@@ -176,6 +174,7 @@ export function CandidateTable({ candidates }: CandidateTableProps) {
                       <td className="px-4 py-2">{candidate.date_of_birth || '-'}</td>
                       <td className="px-4 py-2">{candidate.phone || '-'}</td>
                       <td className="px-4 py-2">{candidate.receive_location || '-'}</td>
+                      <td className="px-4 py-2">{candidate.residence || '-'}</td>
                       <td className="px-4 py-2 font-mono text-xs">{candidate.tracking_number || '-'}</td>
                       <td className="px-4 py-2">{candidate.exam_date}</td>
                       <td className="px-4 py-2">

@@ -1,7 +1,7 @@
 // plx_online/app/(dashboard)/update/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react'; // Bổ sung useRef tại đây
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Search, RefreshCw, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import diachiData from '@/diachi.json'; // Import dữ liệu địa chỉ
 
 interface Candidate {
   sbd: string;
@@ -27,26 +28,24 @@ export default function DirectUpdatePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Form State (Bên trái)
+  // Form State
   const [mSbd, setMSbd] = useState('');
   const [mHoTen, setMHoTen] = useState('');
   const [mNgaySinh, setMNgaySinh] = useState('');
   const [mSdt, setMSdt] = useState('');
   const [mDiaChi, setMDiaChi] = useState('');
 
-  // Trạng thái tìm kiếm: 'idle' (chưa tìm), 'found' (tìm thấy), 'not_found' (không tìm thấy)
+  // Trạng thái gợi ý địa chỉ thông minh
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+
   const [searchStatus, setSearchStatus] = useState<'idle' | 'found' | 'not_found'>('idle');
-
-  // Danh sách thí sinh vừa cập nhật xong trong phiên làm việc này (Bên phải)
   const [recentlyUpdated, setRecentlyUpdated] = useState<Candidate[]>([]);
-
-  // Thông báo kết quả lưu nhanh
   const [message, setMessage] = useState<{ type: 'success' | 'error' | null; content: string }>({ type: null, content: '' });
 
-  // Khai báo ref cho ô nhập số điện thoại
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
-  // Tải danh sách ngày thi và khôi phục trạng thái ngày chọn trước đó từ localStorage
   useEffect(() => {
     const loadSheets = async () => {
       try {
@@ -54,13 +53,11 @@ export default function DirectUpdatePage() {
         const result = await response.json();
         if (result.success && result.sheets && result.sheets.length > 0) {
           setSheetsList(result.sheets);
-          
-          // Kiểm tra xem có lưu ngày làm việc trước đó trong localStorage không
           const savedDate = localStorage.getItem('gplx_selected_update_date');
           if (savedDate && result.sheets.includes(savedDate)) {
             setSelectedDate(savedDate);
           } else {
-            setSelectedDate(result.sheets[0]); // Nếu không có thì chọn ngày mới nhất
+            setSelectedDate(result.sheets[0]);
           }
         }
       } catch (error) {
@@ -70,7 +67,6 @@ export default function DirectUpdatePage() {
     loadSheets();
   }, []);
 
-  // Tải danh sách học viên theo ngày thi đã chọn để phục vụ tra cứu nhanh
   useEffect(() => {
     if (!selectedDate) return;
 
@@ -94,30 +90,27 @@ export default function DirectUpdatePage() {
     loadCandidates();
   }, [selectedDate]);
 
-  // Reset form về mặc định
   const handleResetForm = () => {
     setMSbd('');
     setMHoTen('');
     setMNgaySinh('');
     setMSdt('');
     setMDiaChi('');
+    setSuggestions([]);
+    setShowSuggestions(false);
     setSearchStatus('idle');
     setMessage({ type: null, content: '' });
   };
 
-  // Thay đổi ngày thi chủ động và lưu vào localStorage
   const handleDateChange = (date: string) => {
     setSelectedDate(date);
     localStorage.setItem('gplx_selected_update_date', date);
   };
 
-  // Tra cứu Số báo danh chính xác (===)
   const handleLookup = () => {
     if (!mSbd.trim()) return;
 
     const targetSbd = mSbd.trim().toLowerCase();
-    
-    // Tìm kiếm đối chiếu chính xác tuyệt đối
     const found = candidates.find(c => c.sbd.trim().toLowerCase() === targetSbd);
 
     if (found) {
@@ -128,11 +121,10 @@ export default function DirectUpdatePage() {
       setSearchStatus('found');
       setMessage({ type: null, content: '' });
 
-      // Đợi React cập nhật state để xóa thuộc tính 'disabled' của ô SĐT, sau đó focus và bôi đen
       setTimeout(() => {
         if (phoneInputRef.current) {
           phoneInputRef.current.focus();
-          phoneInputRef.current.select(); // Tiện ích giúp người dùng sửa nhanh SĐT cũ nếu có
+          phoneInputRef.current.select();
         }
       }, 50);
     } else {
@@ -142,7 +134,141 @@ export default function DirectUpdatePage() {
     }
   };
 
-  // Xử lý lưu thông tin trực tiếp
+  // Thuật toán tách lọc địa chỉ thông minh
+  const handleAddressChange = (val: string) => {
+    setMDiaChi(val);
+    if (!val.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const userInput = val.toLowerCase();
+    
+    const normalizeStr = (str: string) => {
+      return str
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[đĐ]/g, 'd')
+        .trim();
+    };
+    const normalizedInput = normalizeStr(userInput);
+
+    const matchedList: any[] = [];
+
+    diachiData.forEach((item: any) => {
+      const initLower = item.Init.toLowerCase();
+      const nLower = item.N.toLowerCase();
+      const kdLower = item.KD.toLowerCase();
+      const nameLower = item.Name.toLowerCase();
+
+      let matchedTextInInput = '';
+      let matchType: 'init' | 'n' | 'kd' | 'name' | 'direct' = 'direct';
+
+      // 1. Kiểm tra phím tắt (Init) ở cuối chuỗi nhập (ví dụ: "25 trần hưng đạo bs", "25 trần hưng đạo, tqb")
+      const initRegex = new RegExp(`(?:\\s|,|^)${initLower}$`, 'i');
+      const initMatch = userInput.match(initRegex);
+
+      if (initMatch) {
+        matchedTextInInput = initMatch[0];
+        matchType = 'init';
+      }
+      // 2. Kiểm tra tên có dấu (N) ở cuối hoặc trong chuỗi nhập
+      else if (userInput.includes(nLower)) {
+        const idx = userInput.lastIndexOf(nLower);
+        matchedTextInInput = val.substring(idx);
+        matchType = 'n';
+      } 
+      // 3. Kiểm tra tên không dấu (KD) trong chuỗi nhập
+      else if (normalizedInput.includes(kdLower)) {
+        const idx = normalizedInput.lastIndexOf(kdLower);
+        matchedTextInInput = val.substring(idx);
+        matchType = 'kd';
+      } 
+      // 4. Kiểm tra tên đầy đủ (Name) trong chuỗi nhập
+      else if (userInput.includes(nameLower)) {
+        const idx = userInput.lastIndexOf(nameLower);
+        matchedTextInInput = val.substring(idx);
+        matchType = 'name';
+      }
+      // 5. Nếu người dùng chỉ gõ đơn thuần tên phường xã để tìm kiếm trực tiếp
+      else if (nameLower.includes(userInput) || nLower.includes(userInput) || kdLower.includes(normalizedInput) || initLower.startsWith(userInput)) {
+        matchedTextInInput = val;
+        matchType = 'direct';
+      }
+
+      if (matchedTextInInput) {
+        matchedList.push({
+          item,
+          matchedTextInInput,
+          matchType
+        });
+      }
+    });
+
+    setSuggestions(matchedList.slice(0, 5));
+    setShowSuggestions(matchedList.length > 0);
+    setActiveSuggestionIndex(0);
+  };
+
+  // Xác nhận và ghép địa chỉ hoàn chỉnh
+  const handleSelectSuggestion = (suggestionData: any) => {
+    const { item, matchedTextInInput, matchType } = suggestionData;
+    
+    let prefix = mDiaChi;
+    if (matchType !== 'direct') {
+      const idx = mDiaChi.toLowerCase().lastIndexOf(matchedTextInInput.toLowerCase());
+      if (idx !== -1) {
+        prefix = mDiaChi.substring(0, idx);
+      }
+    }
+    
+    // Loại bỏ khoảng trắng và dấu phẩy thừa ở cuối số nhà/tên đường
+    prefix = prefix.trim().replace(/[,-\s]+$/, '');
+    
+    // Viết hoa chữ cái đầu của các từ trong tên đường (vd: "25 trần hưng đạo" -> "25 Trần Hưng Đạo")
+    const formattedPrefix = prefix.split(' ').map((word: string) => {
+      if (/^\d/.test(word)) return word; // Giữ nguyên số nhà dạng số
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(' ');
+
+    const capitalizedWard = item.Name.split(' ')
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+
+    const finalAddress = formattedPrefix 
+      ? `${formattedPrefix}, ${capitalizedWard}, TX. Hoài Nhơn, Bình Định`
+      : `${capitalizedWard}, TX. Hoài Nhơn, Bình Định`;
+
+    setMDiaChi(finalAddress);
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
+
+  const handleAddressKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showSuggestions && suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveSuggestionIndex((prev) => (prev + 1) % suggestions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveSuggestionIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSelectSuggestion(suggestions[activeSuggestionIndex]);
+      } else if (e.key === 'Escape') {
+        setShowSuggestions(false);
+      }
+    }
+  };
+
+  const handleAddressBlur = () => {
+    setTimeout(() => {
+      setShowSuggestions(false);
+    }, 200);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -176,7 +302,6 @@ export default function DirectUpdatePage() {
       if (result.success) {
         setMessage({ type: 'success', content: 'Cập nhật thông tin bưu điện thành công!' });
 
-        // Cập nhật mảng tạm thời ở Client
         setCandidates(prev => prev.map(c => {
           if (c.sbd.trim().toLowerCase() === mSbd.trim().toLowerCase()) {
             return { ...c, phone: mSdt, residence: mDiaChi };
@@ -184,7 +309,6 @@ export default function DirectUpdatePage() {
           return c;
         }));
 
-        // Đẩy thí sinh lên đầu danh sách nhật ký phiên làm việc
         const updatedCandidate: Candidate = {
           sbd: mSbd.trim(),
           name: mHoTen,
@@ -199,7 +323,6 @@ export default function DirectUpdatePage() {
           return [updatedCandidate, ...filtered];
         });
 
-        // Xóa form sau khi lưu thành công để chuẩn bị nhập tiếp
         setTimeout(() => {
           handleResetForm();
         }, 1500);
@@ -214,7 +337,6 @@ export default function DirectUpdatePage() {
     }
   };
 
-  // Điền ngược thông tin khi bấm vào cột lịch sử bên phải
   const handleSelectRecent = (candidate: Candidate) => {
     setMSbd(candidate.sbd);
     setMHoTen(candidate.name);
@@ -224,7 +346,6 @@ export default function DirectUpdatePage() {
     setSearchStatus('found');
     setMessage({ type: null, content: '' });
 
-    // Focus vào ô SĐT khi người dùng chọn sửa lại thí sinh trong danh sách lịch sử
     setTimeout(() => {
       if (phoneInputRef.current) {
         phoneInputRef.current.focus();
@@ -241,7 +362,6 @@ export default function DirectUpdatePage() {
       />
 
       <div className="p-4 lg:p-8 space-y-6">
-        {/* Bộ lọc ngày thi chủ động */}
         <Card className="glass">
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -271,10 +391,7 @@ export default function DirectUpdatePage() {
           </CardContent>
         </Card>
 
-        {/* Cấu trúc Master - Detail hai cột */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* PHẦN TRÁI: Form nhập liệu cỡ lớn */}
           <div className="lg:col-span-6">
             <Card className="glass border-primary/20 shadow-xl">
               <CardContent className="pt-6 space-y-6">
@@ -286,7 +403,7 @@ export default function DirectUpdatePage() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Số báo danh - Sử dụng thẻ input thuần cùng style cưỡng chế cỡ chữ lớn */}
+                  {/* Số báo danh */}
                   <div className="space-y-2">
                     <label className="text-base font-bold text-neutral-800 dark:text-neutral-200">Số Báo Danh</label>
                     <div className="flex gap-2">
@@ -316,7 +433,7 @@ export default function DirectUpdatePage() {
                     </div>
                   </div>
 
-                  {/* Khối hiển thị thông tin học viên tìm kiếm */}
+                  {/* Khối hiển thị thông tin */}
                   <div className="bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-100 dark:border-neutral-800/80 rounded-xl p-5 min-h-[140px] flex flex-col justify-center">
                     {searchStatus === 'idle' ? (
                       <div className="text-center text-sm text-muted-foreground">
@@ -346,11 +463,11 @@ export default function DirectUpdatePage() {
                     )}
                   </div>
 
-                  {/* Số điện thoại - Sử dụng thẻ input thuần cùng style cưỡng chế cỡ chữ cực đại 38px */}
+                  {/* Số điện thoại */}
                   <div className="space-y-2">
                     <label className="text-base font-bold text-neutral-800 dark:text-neutral-200">Số Điện Thoại</label>
                     <input
-                      ref={phoneInputRef} // Gán ref tại đây để hỗ trợ focus tự động
+                      ref={phoneInputRef}
                       type="tel"
                       value={mSdt}
                       onChange={(e) => setMSdt(e.target.value)}
@@ -361,21 +478,73 @@ export default function DirectUpdatePage() {
                     />
                   </div>
 
-                  {/* Địa chỉ nhận bưu điện - Sử dụng thẻ input thuần cùng style cưỡng chế cỡ chữ lớn 24px */}
-                  <div className="space-y-2">
+                  {/* Địa chỉ nhận bưu điện với Gợi ý Thông minh */}
+                  <div className="space-y-2 relative">
                     <label className="text-base font-bold text-neutral-800 dark:text-neutral-200">Địa chỉ nhận (qua bưu điện)</label>
                     <input
                       type="text"
                       value={mDiaChi}
-                      onChange={(e) => setMDiaChi(e.target.value)}
-                      placeholder="Nhập địa chỉ nhận..."
+                      onChange={(e) => handleAddressChange(e.target.value)}
+                      onKeyDown={handleAddressKeyDown}
+                      onBlur={handleAddressBlur}
+                      onFocus={() => {
+                        if (mDiaChi && suggestions.length > 0) setShowSuggestions(true);
+                      }}
+                      placeholder="Nhập địa chỉ kèm phường/xã hoặc gõ tắt (vd: bs, tqb)..."
                       className="w-full rounded-lg border border-input bg-transparent px-4 h-16 outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
                       style={{ fontSize: '24px' }}
                       disabled={searchStatus !== 'found'}
                     />
+                    
+                    {/* Hộp gợi ý tự động xổ xuống chứa địa chỉ hoàn thiện dự kiến */}
+                    {showSuggestions && suggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border bg-popover text-popover-foreground shadow-lg overflow-hidden max-h-64 overflow-y-auto border-border">
+                        {suggestions.map((suggestionData, index) => {
+                          const { item, matchedTextInInput, matchType } = suggestionData;
+                          
+                          // Tạo chuỗi xem trước địa chỉ chuẩn hóa sẽ hiển thị
+                          let prefix = mDiaChi;
+                          if (matchType !== 'direct') {
+                            const idx = mDiaChi.toLowerCase().lastIndexOf(matchedTextInInput.toLowerCase());
+                            if (idx !== -1) {
+                              prefix = mDiaChi.substring(0, idx);
+                            }
+                          }
+                          prefix = prefix.trim().replace(/[,-\s]+$/, '');
+                          const formattedPrefix = prefix.split(' ').map((word: string) => {
+                            if (/^\d/.test(word)) return word;
+                            return word.charAt(0).toUpperCase() + word.slice(1);
+                          }).join(' ');
+
+                          const capitalizedWard = item.Name.split(' ')
+                            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+                            .join(' ');
+
+                          const displayAddress = formattedPrefix 
+                            ? `${formattedPrefix}, ${capitalizedWard}, TX. Hoài Nhơn, Bình Định`
+                            : `${capitalizedWard}, TX. Hoài Nhơn, Bình Định`;
+
+                          return (
+                            <div
+                              key={item.Init}
+                              onMouseDown={() => handleSelectSuggestion(suggestionData)}
+                              className={`px-4 py-3 text-lg font-medium cursor-pointer transition-colors flex items-center justify-between ${
+                                index === activeSuggestionIndex
+                                  ? 'bg-primary/10 text-primary font-bold'
+                                  : 'hover:bg-muted'
+                              }`}
+                            >
+                              <span className="truncate mr-2">{displayAddress}</span>
+                              <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground font-mono uppercase shrink-0">
+                                {item.Init}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Trạng thái thông báo lưu dữ liệu */}
                   {message.content && (
                     <div className={`p-4 rounded-xl flex items-center gap-2 text-sm ${
                       message.type === 'success'
@@ -391,7 +560,6 @@ export default function DirectUpdatePage() {
                     </div>
                   )}
 
-                  {/* Nút gửi dữ liệu cập nhật */}
                   <Button
                     type="submit"
                     disabled={isSaving || searchStatus !== 'found'}
@@ -411,7 +579,6 @@ export default function DirectUpdatePage() {
             </Card>
           </div>
 
-          {/* PHẦN PHẢI: Lịch sử học viên vừa cập nhật trong phiên */}
           <div className="lg:col-span-6 space-y-4">
             <Card className="glass h-[calc(100vh-280px)] flex flex-col overflow-hidden border-indigo-500/20 shadow-lg">
               <CardHeader className="pb-3 border-b border-muted">

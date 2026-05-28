@@ -1,3 +1,4 @@
+// plx_online/components/DecisionTreeChart.tsx
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +8,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import mermaid from 'mermaid';
 
-// Khởi tạo mermaid
 mermaid.initialize({
   startOnLoad: false,
   theme: 'default',
@@ -49,14 +49,14 @@ flowchart TD
     
     E -->|Đậu ${report.pass_count}| F{"Đã Nộp Tiền?"}
     
-    F -->|Có ${report.with_app_and_fee.total}| G{"GPLX về +<br/>up postal?"}
+    F -->|Có ${report.with_app_and_fee.total}| G{"GPLX về?"}
     F -->|Không ${report.without_fee.total}| H{"GPLX về?"}
     
-    G -->|Có| I["✅ GPLX về + postal<br/>${report.with_app_and_fee.returned_with_postal} người"]
-    G -->|Chưa| J["⏳ GPLX chưa về<br/>${report.with_app_and_fee.pending} người"]
+    G -->|Có| I["✅ Đã nộp + Có GPLX<br/>${report.with_app_and_fee.returned} người"]
+    G -->|Chưa| J["⏳ Đã nộp - Chờ GPLX<br/>${report.with_app_and_fee.pending} người"]
     
-    H -->|Có| K["📬 GPLX về<br/>${report.without_fee.returned} người"]
-    H -->|Chưa| L["⏸️ Chưa nộp tiền<br/>GPLX chưa về<br/>${report.without_fee.pending} người"]
+    H -->|Có| K["📬 Chưa nộp + Có GPLX<br/>${report.without_fee.returned} người"]
+    H -->|Chưa| L["⏸️ Chưa nộp - Chờ GPLX<br/>${report.without_fee.pending} người"]
     
     J --> M["📌 TỔNG CHƯA CÓ GPLX<br/>${totalPendingGPLX} người"]
     L --> M

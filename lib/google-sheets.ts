@@ -2,13 +2,10 @@
 import { google } from 'googleapis';
 import { Candidate } from '@/types/candidate';
 
-// Singleton pattern để tránh tạo nhiều auth instance
 let sheetsClient: any = null;
-
-// Khởi tạo các biến lưu trữ bộ nhớ đệm RAM (In-Memory Cache) cho tên Sheet
 let cachedSheetNames: string[] | null = null;
 let cachedSheetNamesTimestamp = 0;
-const CACHE_TTL = 3 * 60 * 1000; // Thời gian sống của cache: 3 phút (3 * 60 * 1000ms)
+const CACHE_TTL = 3 * 60 * 1000;
 
 function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
@@ -18,15 +15,14 @@ function getSheetsClient() {
     try {
       credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_CONTENT);
     } catch (error) {
-      throw new Error('Không thể parse biến môi trường GOOGLE_CREDENTIALS_CONTENT. Đảm bảo nội dung là JSON hợp lệ.');
+      throw new Error('Không thể parse biến môi trường GOOGLE_CREDENTIALS_CONTENT.');
     }
   } else {
     const credentialsPath = process.env.GOOGLE_CREDENTIALS_PATH || './google-credentials.json';
     try {
       const fs = require('fs');
       const path = require('path');
-      const absolutePath = path.resolve(credentialsPath);
-      credentials = JSON.parse(fs.readFileSync(absolutePath, 'utf-8'));
+      credentials = JSON.parse(fs.readFileSync(path.resolve(credentialsPath), 'utf-8'));
     } catch (error) {
       throw new Error(`Không thể đọc file credentials tại: ${credentialsPath}.`);
     }
@@ -44,9 +40,6 @@ function getSheetsClient() {
   return sheetsClient;
 }
 
-/**
- * Hàm trợ giúp tự động thêm tiền tố nháy đơn để Google Sheets hiểu là chữ
- */
 function formatAsTextValue(val: string | number | undefined): string {
   if (val === undefined || val === null) return '';
   const str = String(val).trim();
@@ -55,35 +48,24 @@ function formatAsTextValue(val: string | number | undefined): string {
   return `'${str}`;
 }
 
-/**
- * Chuyển đổi tên sheet ngày tháng sang Object Date để phục vụ sắp xếp
- */
 function parseSheetNameToDate(name: string): Date {
   const parts = name.split('-');
   if (parts.length === 3) {
     if (parts[0].length === 4) {
-      // yyyy-MM-dd
       return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
     } else {
-      // dd-MM-yyyy
       return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
     }
   }
-  return new Date(0); // Fallback đối với định dạng không hợp lệ
+  return new Date(0);
 }
 
-/**
- * Xóa bộ nhớ đệm danh sách tên sheet khi có thay đổi (ví dụ: tạo sheet mới)
- */
 export function clearSheetNamesCache() {
   cachedSheetNames = null;
   cachedSheetNamesTimestamp = 0;
   console.log('🗑️ [Cache] Đã xóa bộ nhớ đệm danh sách tên Sheet');
 }
 
-/**
- * Kiểm tra xem chuỗi có phải là định dạng ngày hợp lệ không (dd-MM-yyyy hoặc yyyy-MM-dd)
- */
 export function isValidDateSheetName(name: string): boolean {
   const ddMMyyyyRegex = /^\d{2}-\d{2}-\d{4}$/;
   const yyyyMMddRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -115,36 +97,25 @@ export function isValidDateSheetName(name: string): boolean {
   return true;
 }
 
-/**
- * Sắp xếp lại thứ tự tất cả các sheet trong bảng tính theo trình tự thời gian
- */
 async function reorderSheetsChronologically(sheets: any, spreadsheetId: string | undefined): Promise<void> {
   if (!spreadsheetId) return;
 
   console.log('🔄 Đang tiến hành sắp xếp lại các sheet theo thứ tự thời gian...');
-  
-  // Lấy toàn bộ thông tin các sheet hiện tại
   const response = await sheets.spreadsheets.get({
     spreadsheetId,
   });
 
   const allSheets = response.data.sheets || [];
-
-  // Phân tách sheet ngày tháng và các sheet khác
   const dateSheets = allSheets.filter((s: any) => isValidDateSheetName(s.properties.title));
   const otherSheets = allSheets.filter((s: any) => !isValidDateSheetName(s.properties.title));
 
-  // Sắp xếp các sheet ngày tháng tăng dần (Từ cũ đến mới)
   dateSheets.sort((a: any, b: any) => {
     const dateA = parseSheetNameToDate(a.properties.title).getTime();
     const dateB = parseSheetNameToDate(b.properties.title).getTime();
     return dateA - dateB;
   });
 
-  // Gộp lại danh sách với các sheet ngày tháng nằm phía trước
   const sortedSheets = [...dateSheets, ...otherSheets];
-
-  // Tạo các yêu cầu cập nhật vị trí index cho từng sheet
   const requests = sortedSheets.map((sheet: any, index: number) => ({
     updateSheetProperties: {
       properties: {
@@ -158,22 +129,15 @@ async function reorderSheetsChronologically(sheets: any, spreadsheetId: string |
   if (requests.length > 0) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
-      requestBody: {
-        requests,
-      },
+      requestBody: { requests },
     });
     console.log('✅ Đã sắp xếp vị trí các sheet thành công.');
   }
 }
 
-/**
- * Lấy danh sách tất cả các Sheet (Sử dụng RAM Cache để tránh vượt định mức Quota Google)
- */
 export async function getAllSheetNames(forceRefresh = false): Promise<string[]> {
   const now = Date.now();
-  
   if (!forceRefresh && cachedSheetNames && (now - cachedSheetNamesTimestamp < CACHE_TTL)) {
-    // Đã gỡ bỏ console.log ở đây để tránh spam log khi trúng Cache RAM
     return cachedSheetNames;
   }
 
@@ -190,13 +154,9 @@ export async function getAllSheetNames(forceRefresh = false): Promise<string[]> 
 
   cachedSheetNames = validDateSheets;
   cachedSheetNamesTimestamp = now;
-
   return validDateSheets;
 }
 
-/**
- * Tìm tên sheet thực tế hỗ trợ chuyển đổi linh hoạt giữa dd-MM-yyyy và yyyy-MM-dd
- */
 export async function findSheetNameWithFallback(requestedName: string): Promise<string> {
   try {
     const existingSheets = await getAllSheetNames();
@@ -224,10 +184,6 @@ export async function findSheetNameWithFallback(requestedName: string): Promise<
   return requestedName;
 }
 
-/**
- * Đọc dữ liệu từ một sheet cụ thể
- * Bổ sung tham số skipFallback để tối ưu hóa, tránh gọi vòng lặp redundant
- */
 export async function readSheet(sheetName: string, skipFallback = false): Promise<Candidate[]> {
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
@@ -258,20 +214,15 @@ export async function readSheet(sheetName: string, skipFallback = false): Promis
     exam_status: parseExamStatus(getCellValue(row, headers, ['kết quả thi', 'ket qua thi', 'exam_status'])),
     has_app_and_fee: parseBool(getCellValue(row, headers, ['đã nộp tiền', 'da nop tien', 'đk app + tiền', 'dk app', 'has_app_and_fee'])),
     gplx_status: parseGPLXStatus(getCellValue(row, headers, ['trạng thái gplx', 'trang thai gplx', 'gplx_status'])),
-    has_postal_up: parseBool(getCellValue(row, headers, ['đã up portal', 'da up portal', 'up portal', 'đã up', 'da up', 'up postal', 'has_postal_up'])),
   }));
 }
 
-/**
- * Đọc tất cả các sheet và trả về Map (Đã được tối ưu hóa bỏ qua so khớp dư thừa)
- */
 export async function readAllSheets(): Promise<Map<string, Candidate[]>> {
   const sheetNames = await getAllSheetNames();
   const result = new Map<string, Candidate[]>();
 
   const promises = sheetNames.map(async (name) => {
     try {
-      // Gán tham số skipFallback = true vì tên sheet này chắc chắn đã chính xác
       const candidates = await readSheet(name, true);
       return { name, candidates };
     } catch (error) {
@@ -290,23 +241,17 @@ export async function readAllSheets(): Promise<Map<string, Candidate[]>> {
   return result;
 }
 
-/**
- * Tạo sheet mới cho ngày thi (Thiết lập tự động định dạng Văn bản cho SBD và SĐT & Sắp xếp vị trí)
- */
 export async function createNewSheet(sheetName: string): Promise<void> {
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
-  // 1. Tạo sheet mới
   const response = await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: {
       requests: [
         {
           addSheet: {
-            properties: {
-              title: sheetName,
-            },
+            properties: { title: sheetName },
           },
         },
       ],
@@ -315,7 +260,6 @@ export async function createNewSheet(sheetName: string): Promise<void> {
 
   const sheetId = response.data.replies?.[0]?.addSheet?.properties?.sheetId;
 
-  // 2. Tự động định dạng Cột A (SBD - index 0) và Cột D (SĐT - index 3) thành Văn bản thuần (TEXT)
   if (sheetId !== undefined && sheetId !== null) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
@@ -326,14 +270,10 @@ export async function createNewSheet(sheetName: string): Promise<void> {
               range: {
                 sheetId: sheetId,
                 startColumnIndex: 0,
-                endColumnIndex: 1, // Cột A (SBD)
+                endColumnIndex: 1,
               },
               cell: {
-                userEnteredFormat: {
-                  numberFormat: {
-                    type: 'TEXT',
-                  },
-                },
+                userEnteredFormat: { numberFormat: { type: 'TEXT' } },
               },
               fields: 'userEnteredFormat.numberFormat',
             },
@@ -343,14 +283,10 @@ export async function createNewSheet(sheetName: string): Promise<void> {
               range: {
                 sheetId: sheetId,
                 startColumnIndex: 3,
-                endColumnIndex: 4, // Cột D (Số Điện thoại)
+                endColumnIndex: 4,
               },
               cell: {
-                userEnteredFormat: {
-                  numberFormat: {
-                    type: 'TEXT',
-                  },
-                },
+                userEnteredFormat: { numberFormat: { type: 'TEXT' } },
               },
               fields: 'userEnteredFormat.numberFormat',
             },
@@ -360,27 +296,22 @@ export async function createNewSheet(sheetName: string): Promise<void> {
     });
   }
 
-  // 3. Ghi dữ liệu tiêu đề chính
+  // Định nghĩa lại Header của bảng tính mới: Nơi Nhận lên trước Nơi cư trú, loại bỏ Portal
   const headers = [
-    ['SBD', 'Họ tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi cư trú', 'Nơi Nhận', 'Mã Vận Đơn', 'Có hồ sơ', 'Kết quả thi', 'Đã Nộp Tiền', 'Trạng thái GPLX', 'Đã Up Portal'],
+    ['SBD', 'Họ tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi Nhận', 'Nơi cư trú', 'Mã Vận Đơn', 'Có hồ sơ', 'Kết quả thi', 'Đã Nộp Tiền', 'Trạng thái GPLX'],
   ];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${sheetName}'!A1:L1`,
+    range: `'${sheetName}'!A1:K1`,
     valueInputOption: 'RAW',
     requestBody: { values: headers },
   });
 
-  // 4. Sắp xếp lại thứ tự các sheet theo trình tự thời gian
   await reorderSheetsChronologically(sheets, spreadsheetId);
-
   clearSheetNamesCache();
 }
 
-/**
- * Ghi dữ liệu vào một sheet cụ thể
- */
 export async function writeToSheet(sheetName: string, candidates: Candidate[]): Promise<void> {
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
@@ -392,27 +323,23 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
     c.name,
     c.date_of_birth || '',
     formatAsTextValue(c.phone),
-    c.residence || '',
-    c.receive_location || '',
+    c.receive_location || '',   // Cột 5: Nơi Nhận
+    c.residence || '',          // Cột 6: Nơi cư trú
     c.tracking_number || '',
     c.has_profile ? 'Có' : 'Không',
     c.exam_status,
     c.has_app_and_fee ? 'Có' : 'Không',
     c.gplx_status,
-    c.has_postal_up ? 'Có' : 'Không',
   ]);
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${actualSheetName}'!A2:L${values.length + 1}`,
+    range: `'${actualSheetName}'!A2:K${values.length + 1}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values },
   });
 }
 
-/**
- * Cập nhật danh sách thí sinh vào sheet (ghi đè toàn bộ dữ liệu)
- */
 export async function updateCandidatesInSheet(sheetName: string, candidates: Candidate[]): Promise<void> {
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
@@ -425,38 +352,35 @@ export async function updateCandidatesInSheet(sheetName: string, candidates: Can
     c.name,
     c.date_of_birth || '',
     formatAsTextValue(c.phone),
-    c.residence || '',
-    c.receive_location || '',
+    c.receive_location || '',   // Cột 5: Nơi Nhận
+    c.residence || '',          // Cột 6: Nơi cư trú
     c.tracking_number || '',
     c.has_profile ? 'Có' : 'Không',
     c.exam_status === 'Pass' ? 'Đậu' : c.exam_status === 'Fail' ? 'Rớt' : 'Chưa thi',
     c.has_app_and_fee ? 'Có' : 'Không',
     c.gplx_status === 'Returned' ? 'Đã về' : 'Chờ',
-    c.has_postal_up ? 'Có' : 'Không',
   ]);
 
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `'${actualSheetName}'!A2:L1000`,
+    range: `'${actualSheetName}'!A2:K1000`,
   });
 
   if (values.length > 0) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `'${actualSheetName}'!A2:L${lastRow}`,
+      range: `'${actualSheetName}'!A2:K${lastRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values },
     });
   }
 }
 
-// Helper functions
 function getCellValue(row: any[], headers: string[], possibleNames: string[]): string {
   for (const name of possibleNames) {
     const index = headers.indexOf(name.toLowerCase());
     if (index !== -1 && row[index] !== undefined) {
       let val = String(row[index]).trim();
-      // Loại bỏ dấu nháy đơn nếu tồn tại để xử lý dữ liệu sạch trong app
       if (val.startsWith("'")) {
         val = val.slice(1);
       }

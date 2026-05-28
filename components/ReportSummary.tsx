@@ -1,3 +1,4 @@
+// plx_online/components/ReportSummary.tsx
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +22,6 @@ export function ReportSummary({ report }: ReportSummaryProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Hàng 1 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="pt-6">
@@ -43,7 +43,6 @@ export function ReportSummary({ report }: ReportSummaryProps) {
             </Card>
           </div>
 
-          {/* Hàng 2 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
@@ -55,9 +54,9 @@ export function ReportSummary({ report }: ReportSummaryProps) {
                   <Badge variant="outline">{report.with_app_and_fee.total}</Badge>
                 </div>
                 <div className="flex justify-between">
-                  <span>GPLX về + up postal:</span>
+                  <span>GPLX đã về:</span>
                   <Badge className="bg-green-100 text-green-800">
-                    {report.with_app_and_fee.returned_with_postal}
+                    {report.with_app_and_fee.returned}
                   </Badge>
                 </div>
                 <div className="flex justify-between">
@@ -79,7 +78,7 @@ export function ReportSummary({ report }: ReportSummaryProps) {
                   <Badge variant="outline">{report.without_fee.total}</Badge>
                 </div>
                 <div className="flex justify-between">
-                  <span>GPLX về:</span>
+                  <span>GPLX đã về:</span>
                   <Badge className="bg-green-100 text-green-800">
                     {report.without_fee.returned}
                   </Badge>
@@ -94,7 +93,6 @@ export function ReportSummary({ report }: ReportSummaryProps) {
             </Card>
           </div>
 
-          {/* Tổng kết */}
           <Card className="bg-blue-50 border-blue-200">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">

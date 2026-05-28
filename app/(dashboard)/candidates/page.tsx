@@ -20,13 +20,13 @@ interface Candidate {
   date_of_birth?: string;
   phone?: string;
   receive_location?: string;
+  residence?: string;
   tracking_number?: string;
   exam_date: string;
   has_profile: boolean;
   exam_status: 'Pass' | 'Fail' | 'Not_Tested';
   has_app_and_fee: boolean;
   gplx_status: 'Returned' | 'Pending';
-  has_postal_up?: boolean;
 }
 
 interface ExcelRow {
@@ -38,9 +38,6 @@ interface ExcelRow {
 
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag-vDGsZgmH4rX_TicLtVwD-y696bgk/edit?usp=sharing';
 
-/**
- * Tách chuỗi người nhận ở cột E thành SBD, Họ Tên, Ngày Sinh
- */
 function parseRecipient(text: string) {
   const cleaned = text.trim();
   if (!cleaned) return { sbd: '', name: '', dob: '' };
@@ -50,13 +47,11 @@ function parseRecipient(text: string) {
   let dob = '';
   let nameParts = [...parts];
 
-  // Kiểm tra nếu phần đầu tiên là chữ số (Số báo danh)
   if (/^\d+$/.test(parts[0])) {
     sbd = parts[0];
     nameParts.shift();
   }
 
-  // Kiểm tra nếu phần cuối cùng là ngày sinh (định dạng d/m/y, d-m-y hoặc serial 5 chữ số của Excel)
   if (nameParts.length > 0) {
     const lastToken = nameParts[nameParts.length - 1];
     if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(lastToken) || /^\d{5}$/.test(lastToken)) {
@@ -77,7 +72,6 @@ export default function CandidatesPage() {
   const [sheetsList, setSheetsList] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Trạng thái cập nhật mã hiệu
   const [isUpdatingCode, setIsUpdatingCode] = useState(false);
   const [updateResult, setUpdateResult] = useState<{ success: boolean; message: string; updatedCount?: number } | null>(null);
   const [conflicts, setConflicts] = useState<any[]>([]);
@@ -169,16 +163,13 @@ export default function CandidatesPage() {
       const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       
       const excelData: ExcelRow[] = [];
-      // Đọc từ Hàng 3 trở đi (index 2)
       for (let i = 2; i < rawData.length; i++) {
         const row = rawData[i];
         if (!row || row.length === 0) continue;
         
-        // Cột E (index 4) là người nhận
         const recipientVal = row[4] ? String(row[4]).trim() : '';
         if (!recipientVal) continue;
 
-        // Cột M (index 12) là số hiệu BG / Mã hiệu
         const code = row[12] ? String(row[12]).trim() : '';
         
         const parsed = parseRecipient(recipientVal);
@@ -245,7 +236,6 @@ export default function CandidatesPage() {
       const result = await response.json();
       if (result.success) {
         alert(result.message);
-        // Loại bỏ dòng đã chọn thành công ra khỏi màn hình
         setConflicts(prev => prev.filter((_, idx) => idx !== conflictIndex));
         await loadCandidates();
       } else {
@@ -280,13 +270,14 @@ export default function CandidatesPage() {
       }
 
       const excelData = [
-        ['SBD', 'Họ Tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Kết Quả', 'Đã Nộp Tiền', 'Trạng Thái GPLX'],
+        ['SBD', 'Họ Tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi Nhận', 'Nơi Cư Trú', 'Mã Vận Đơn', 'Kết Quả', 'Đã Nộp Tiền', 'Trạng Thái GPLX'],
         ...pendingCandidates.map((c) => [
           c.sbd,
           c.name,
           c.date_of_birth || '',
           c.phone || '',
-          c.receive_location || '',
+          c.receive_location || '', // Nơi Nhận đứng trước
+          c.residence || '',        // Nơi Cư Trú đứng sau
           c.tracking_number || '',
           c.exam_status === 'Pass' ? 'Đậu' : c.exam_status === 'Fail' ? 'Rớt' : 'Chưa thi',
           c.has_app_and_fee ? 'Đã Nộp' : 'Chưa Nộp',
@@ -298,7 +289,7 @@ export default function CandidatesPage() {
       const worksheet = XLSX.utils.aoa_to_sheet(excelData);
       
       worksheet['!cols'] = [
-        { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 18 }
+        { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 25 }, { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 18 }
       ];
 
       const workbook = XLSX.utils.book_new();
@@ -328,7 +319,6 @@ export default function CandidatesPage() {
       />
 
       <div className="p-4 lg:p-8 space-y-6">
-        {/* Controls */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-3">
@@ -398,7 +388,6 @@ export default function CandidatesPage() {
           </Card>
         </div>
 
-        {/* Nút Upload Cập Nhật Mã Hiệu bưu điện */}
         <Card className="border-blue-200 bg-blue-50/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2 text-blue-700">
@@ -437,7 +426,6 @@ export default function CandidatesPage() {
           </CardContent>
         </Card>
 
-        {/* BẢNG XỬ LÝ TRÙNG LẶP NHIỀU NGÀY THI (CONFLICTS) */}
         {conflicts.length > 0 && (
           <Card className="border-amber-200 bg-amber-50/50">
             <CardHeader>
@@ -493,7 +481,6 @@ export default function CandidatesPage() {
           </Card>
         )}
 
-        {/* BẢNG DANH SÁCH KHÔNG TÌM THẤY HỌC VIÊN (UNMATCHED) */}
         {unmatched.length > 0 && (
           <Card className="border-red-200 bg-red-50/50">
             <CardHeader>
@@ -531,7 +518,6 @@ export default function CandidatesPage() {
           </Card>
         )}
 
-        {/* Ngày thi có dữ liệu */}
         {sheetsList.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
@@ -554,7 +540,6 @@ export default function CandidatesPage() {
           </Card>
         )}
 
-        {/* Thống kê nhanh */}
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
           <StatCard label="Tổng HV" value={stats.total} color="from-blue-500 to-cyan-500" />
           <StatCard label="Đậu" value={stats.passed} color="from-emerald-500 to-teal-500" />
@@ -564,7 +549,6 @@ export default function CandidatesPage() {
           <StatCard label="Đã nhận GPLX" value={stats.returnedGPLX} color="from-indigo-500 to-violet-500" />
         </div>
 
-        {/* Danh sách học viên */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -599,12 +583,12 @@ export default function CandidatesPage() {
                       <th className="py-3 px-4 font-semibold">Ngày Sinh</th>
                       <th className="py-3 px-4 font-semibold">Số Điện Thoại</th>
                       <th className="py-3 px-4 font-semibold">Nơi Nhận</th>
+                      <th className="py-3 px-4 font-semibold">Nơi cư trú</th>
                       <th className="py-3 px-4 font-semibold">Mã Vận Đơn</th>
                       <th className="text-center py-3 px-4 font-semibold">Hồ sơ</th>
                       <th className="text-center py-3 px-4 font-semibold">Kết quả</th>
                       <th className="text-center py-3 px-4 font-semibold">Đã Nộp Tiền</th>
                       <th className="text-center py-3 px-4 font-semibold">GPLX</th>
-                      <th className="text-center py-3 px-4 font-semibold">Postal</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -615,6 +599,7 @@ export default function CandidatesPage() {
                         <td className="py-3 px-4 text-sm">{candidate.date_of_birth || '-'}</td>
                         <td className="py-3 px-4 text-sm">{candidate.phone || '-'}</td>
                         <td className="py-3 px-4 text-sm">{candidate.receive_location || '-'}</td>
+                        <td className="py-3 px-4 text-sm">{candidate.residence || '-'}</td>
                         <td className="py-3 px-4 font-mono text-xs">{candidate.tracking_number || '-'}</td>
                         <td className="text-center py-3 px-4">
                           <Badge variant={candidate.has_profile ? 'default' : 'secondary'}>{candidate.has_profile ? '✓' : '✗'}</Badge>
@@ -627,9 +612,6 @@ export default function CandidatesPage() {
                         </td>
                         <td className="text-center py-3 px-4">
                           <Badge variant={candidate.gplx_status === 'Returned' ? 'default' : 'secondary'}>{candidate.gplx_status === 'Returned' ? 'Đã về' : 'Chờ'}</Badge>
-                        </td>
-                        <td className="text-center py-3 px-4">
-                          <Badge variant={candidate.has_postal_up ? 'default' : 'secondary'}>{candidate.has_postal_up ? '✓' : '✗'}</Badge>
                         </td>
                       </tr>
                     ))}

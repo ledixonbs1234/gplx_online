@@ -1,8 +1,9 @@
+// plx_online/types/candidate.ts
 export type ExamStatus = 'Pass' | 'Fail' | 'Not_Tested';
 export type GPLXStatus = 'Returned' | 'Pending';
 
 export interface Candidate {
-  sbd: string; // Số báo danh (thay cho ID)
+  sbd: string; // Số báo danh
   name: string;
   date_of_birth?: string; // Ngày sinh
   phone?: string; // Số điện thoại
@@ -14,7 +15,6 @@ export interface Candidate {
   exam_status: ExamStatus;
   has_app_and_fee: boolean;
   gplx_status: GPLXStatus;
-  has_postal_up?: boolean;
 }
 
 export interface DayReport {
@@ -25,7 +25,7 @@ export interface DayReport {
   pass_count: number;
   with_app_and_fee: {
     total: number;
-    returned_with_postal: number;
+    returned: number; // Chỉ còn ghi nhận GPLX đã về
     pending: number;
   };
   without_fee: {

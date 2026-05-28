@@ -1,3 +1,4 @@
+// plx_online/lib/excel-parser.ts
 import * as XLSX from 'xlsx';
 import { Candidate } from '@/types/candidate';
 
@@ -15,13 +16,13 @@ export function parseExcelFile(fileBuffer: Buffer): Map<string, Candidate[]> {
       date_of_birth: row['Ngày Sinh'] || row['Date Of Birth'] || row['DOB'] || undefined,
       phone: row['Số Điện Thoại'] || row['Phone'] || undefined,
       receive_location: row['Nơi Nhận'] || row['Receive Location'] || undefined,
-      tracking_number: row['Mã Vận Đơn'] || row['Tracking Number'] || undefined,
+      residence: row['Nơi Cư Trú'] || row['Residence'] || row['Địa Chỉ'] || undefined,
+      tracking_number: row['Mã Vận Đơn'] || row['Tracking Number'] || row['Tracking'] || undefined,
       exam_date: sheetName,
       has_profile: parseBoolean(row['Có hồ sơ'] || row['has_profile']),
       exam_status: parseExamStatus(row['Kết quả thi'] || row['exam_status']),
       has_app_and_fee: parseBoolean(row['Đã Nộp Tiền'] || row['has_app_and_fee']),
       gplx_status: parseGPLXStatus(row['Trạng thái GPLX'] || row['gplx_status']),
-      has_postal_up: parseBoolean(row['Đã Up Portal'] || row['Up portal'] || row['has_postal_up']),
     }));
 
     candidatesByDate.set(sheetName, candidates);

@@ -1,3 +1,4 @@
+// plx_online/components/ExportButton.tsx
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,6 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
   const handleExport = () => {
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: Báo cáo tổng hợp
     const summaryData = [
       ['BÁO CÁO NGÀY THI', report.date],
       [],
@@ -27,12 +27,12 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
       [],
       ['NHÓM ĐÃ NỘP TIỀN', '', 'SỐ LƯỢNG'],
       ['Tổng số', '', report.with_app_and_fee.total],
-      ['GPLX về + up postal', '', report.with_app_and_fee.returned_with_postal],
+      ['GPLX đã về', '', report.with_app_and_fee.returned],
       ['GPLX chưa về', '', report.with_app_and_fee.pending],
       [],
       ['NHÓM CHƯA NỘP TIỀN', '', 'SỐ LƯỢNG'],
       ['Tổng số', '', report.without_fee.total],
-      ['GPLX về', '', report.without_fee.returned],
+      ['GPLX đã về', '', report.without_fee.returned],
       ['GPLX chưa về', '', report.without_fee.pending],
       [],
       ['TỔNG KẾT', '', ''],
@@ -40,8 +40,6 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
     ];
 
     const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-    
-    // Set độ rộng cột
     summarySheet['!cols'] = [
       { wch: 35 },
       { wch: 5 },
@@ -50,22 +48,21 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
     
     XLSX.utils.book_append_sheet(wb, summarySheet, 'Báo cáo tổng hợp');
 
-    // Sheet 2: Danh sách chi tiết
     const detailData = [
-      ['SBD', 'Họ tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi Nhận', 'Mã Vận Đơn', 'Ngày thi', 'Có hồ sơ', 'Kết quả', 'Đã Nộp Tiền', 'GPLX', 'Đã Up Portal'],
+      ['SBD', 'Họ tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi Nhận', 'Nơi cư trú', 'Mã Vận Đơn', 'Ngày thi', 'Có hồ sơ', 'Kết quả', 'Đã Nộp Tiền', 'GPLX'],
       ...candidates.map((c) => [
         c.sbd,
         c.name,
         c.date_of_birth || '',
         c.phone || '',
-        c.receive_location || '',
+        c.receive_location || '', // Nơi Nhận lên trước
+        c.residence || '',        // Nơi cư trú ra sau
         c.tracking_number || '',
         c.exam_date,
         c.has_profile ? 'Có' : 'Không',
         c.exam_status,
         c.has_app_and_fee ? 'Đã Nộp' : 'Chưa Nộp',
-        c.gplx_status,
-        c.has_postal_up ? 'Có' : 'Không',
+        c.gplx_status === 'Returned' ? 'Đã về' : 'Chờ',
       ]),
     ];
 
@@ -76,18 +73,17 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
       { wch: 15 },
       { wch: 15 },
       { wch: 20 },
+      { wch: 20 },
       { wch: 15 },
       { wch: 15 },
       { wch: 12 },
       { wch: 15 },
       { wch: 15 },
       { wch: 15 },
-      { wch: 12 },
     ];
     
     XLSX.utils.book_append_sheet(wb, detailSheet, 'Danh sách chi tiết');
 
-    // Sheet 3: Danh sách cần lọc (chưa có GPLX)
     const pendingCandidates = candidates.filter(
       (c) => c.exam_status === 'Pass' && c.gplx_status === 'Pending'
     );
@@ -114,7 +110,6 @@ export function ExportButton({ candidates, report }: ExportButtonProps) {
     
     XLSX.utils.book_append_sheet(wb, pendingSheet, 'Cần lọc - Chưa có GPLX');
 
-    // Xuất file
     const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const data = new Blob([excelBuffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

@@ -98,7 +98,7 @@ export async function POST(request: Request) {
         rowData[phoneIdx] = '';
       }
     }
-    if (residenceIdx !== -1) rowData[residenceIdx] = residence || '';
+    // if (residenceIdx !== -1) rowData[residenceIdx] = residence || '';
     if (receiveLocationIdx !== -1) rowData[receiveLocationIdx] = residence || '';
 
     // Đồng bộ đảm bảo SBD dòng này cũng giữ nguyên tiền tố nháy đơn
