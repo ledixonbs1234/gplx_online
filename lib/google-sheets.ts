@@ -374,6 +374,187 @@ export async function updateCandidatesInSheet(sheetName: string, candidates: Can
       requestBody: { values },
     });
   }
+
+  // Tự động tối ưu giao diện bảng tính ngay sau khi cập nhật thành công
+  try {
+    await formatSheetLayout(sheets, spreadsheetId, actualSheetName, candidates.length);
+  } catch (error) {
+    console.error('Lỗi định dạng bảng tính Google Sheets:', error);
+  }
+}
+
+async function formatSheetLayout(sheets: any, spreadsheetId: string | undefined, sheetName: string, totalRows: number): Promise<void> {
+  if (!spreadsheetId) return;
+
+  const response = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheet = response.data.sheets?.find((s: any) => s.properties.title === sheetName);
+  if (!sheet) return;
+  const sheetId = sheet.properties.sheetId;
+
+  const requests = [
+    // 1. Định dạng header hàng đầu tiên: Màu nền xanh lục nhạt #2e7d32, chữ in đậm màu trắng, canh giữa
+    {
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: 0,
+          endRowIndex: 1,
+          startColumnIndex: 0,
+          endColumnIndex: 11
+        },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: { red: 0.18, green: 0.49, blue: 0.20 }, // #2e7d32
+            textFormat: {
+              bold: true,
+              foregroundColor: { red: 1.0, green: 1.0, blue: 1.0 },
+              fontSize: 10
+            },
+            horizontalAlignment: 'CENTER',
+            verticalAlignment: 'MIDDLE',
+          }
+        },
+        fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)'
+      }
+    },
+    // 2. Vẽ đường viền (Gridlines) mờ nhẹ cho toàn bộ bảng dữ liệu
+    {
+      updateBorders: {
+        range: {
+          sheetId,
+          startRowIndex: 0,
+          endRowIndex: totalRows + 1,
+          startColumnIndex: 0,
+          endColumnIndex: 11
+        },
+        top: { style: 'SOLID', width: 1, color: { red: 0.8, green: 0.8, blue: 0.8 } },
+        bottom: { style: 'SOLID', width: 1, color: { red: 0.8, green: 0.8, blue: 0.8 } },
+        left: { style: 'SOLID', width: 1, color: { red: 0.8, green: 0.8, blue: 0.8 } },
+        right: { style: 'SOLID', width: 1, color: { red: 0.8, green: 0.8, blue: 0.8 } },
+        innerHorizontal: { style: 'SOLID', width: 1, color: { red: 0.8, green: 0.8, blue: 0.8 } },
+        innerVertical: { style: 'SOLID', width: 1, color: { red: 0.8, green: 0.8, blue: 0.8 } }
+      }
+    },
+    // 3. Canh giữa các cột văn bản ngắn: SBD, Ngày sinh, Số điện thoại, và các cột Trạng thái
+    {
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: 1,
+          endRowIndex: totalRows + 1,
+          startColumnIndex: 0,
+          endColumnIndex: 1
+        },
+        cell: {
+          userEnteredFormat: { horizontalAlignment: 'CENTER' }
+        },
+        fields: 'userEnteredFormat(horizontalAlignment)'
+      }
+    },
+    {
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: 1,
+          endRowIndex: totalRows + 1,
+          startColumnIndex: 2,
+          endColumnIndex: 4
+        },
+        cell: {
+          userEnteredFormat: { horizontalAlignment: 'CENTER' }
+        },
+        fields: 'userEnteredFormat(horizontalAlignment)'
+      }
+    },
+    {
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: 1,
+          endRowIndex: totalRows + 1,
+          startColumnIndex: 7,
+          endColumnIndex: 11
+        },
+        cell: {
+          userEnteredFormat: { horizontalAlignment: 'CENTER' }
+        },
+        fields: 'userEnteredFormat(horizontalAlignment)'
+      }
+    },
+    // 4. Định dạng TEXT cho cột SBD và Điện thoại để không bị mất số 0 ở đầu
+    {
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: 1,
+          endRowIndex: totalRows + 1,
+          startColumnIndex: 0,
+          endColumnIndex: 1,
+        },
+        cell: {
+          userEnteredFormat: { numberFormat: { type: 'TEXT' } },
+        },
+        fields: 'userEnteredFormat.numberFormat',
+      },
+    },
+    {
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: 1,
+          endRowIndex: totalRows + 1,
+          startColumnIndex: 3,
+          endColumnIndex: 4,
+        },
+        cell: {
+          userEnteredFormat: { numberFormat: { type: 'TEXT' } },
+        },
+        fields: 'userEnteredFormat.numberFormat',
+      },
+    },
+    // 5. Căn chỉnh kích thước cột rộng rãi để tránh hiện tượng bị ẩn chữ
+    {
+      updateDimensionProperties: {
+        range: {
+          sheetId,
+          dimension: 'COLUMNS',
+          startIndex: 0,
+          endIndex: 11
+        },
+        properties: { pixelSize: 110 },
+        fields: 'pixelSize'
+      }
+    },
+    {
+      updateDimensionProperties: {
+        range: {
+          sheetId,
+          dimension: 'COLUMNS',
+          startIndex: 1,
+          endIndex: 2
+        },
+        properties: { pixelSize: 180 }, // Họ tên rộng hơn
+        fields: 'pixelSize'
+      }
+    },
+    {
+      updateDimensionProperties: {
+        range: {
+          sheetId,
+          dimension: 'COLUMNS',
+          startIndex: 4,
+          endIndex: 6
+        },
+        properties: { pixelSize: 220 }, // Nơi Nhận & Nơi cư trú rộng rãi
+        fields: 'pixelSize'
+      }
+    }
+  ];
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests }
+  });
 }
 
 function getCellValue(row: any[], headers: string[], possibleNames: string[]): string {

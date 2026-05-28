@@ -216,8 +216,22 @@ export default function DashboardPage() {
               <GoogleSheetsSync onSyncComplete={handleSheetsSync} />
             </TabsContent>
 
-            <TabsContent value="excel">
-              <FileUploader onFileUploaded={handleFileUpload} />
+          <TabsContent value="excel">
+              <FileUploader onUploadSuccess={async () => {
+                // Tự động đồng bộ và nạp dữ liệu từ Google Sheets về Vercel / Dashboard tức thì
+                setIsLoading(true);
+                try {
+                  const response = await fetch('/api/sheets/sync');
+                  const result = await response.json();
+                  if (result.success) {
+                    processCandidatesData(result.data);
+                  }
+                } catch (error) {
+                  console.error('Lỗi tự động nạp đồng bộ Dashboard:', error);
+                } finally {
+                  setIsLoading(false);
+                }
+              }} />
             </TabsContent>
           </Tabs>
         </motion.div>
