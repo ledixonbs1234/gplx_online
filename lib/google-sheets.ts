@@ -135,7 +135,6 @@ async function reorderSheetsChronologically(sheets: any, spreadsheetId: string |
   const otherSheets = allSheets.filter((s: any) => !isValidDateSheetName(s.properties.title));
 
   // Sắp xếp các sheet ngày tháng tăng dần (Từ cũ đến mới)
-  // Nếu muốn sắp xếp từ mới đến cũ, bạn có thể đổi thành: dateB - dateA
   dateSheets.sort((a: any, b: any) => {
     const dateA = parseSheetNameToDate(a.properties.title).getTime();
     const dateB = parseSheetNameToDate(b.properties.title).getTime();
@@ -174,7 +173,7 @@ export async function getAllSheetNames(forceRefresh = false): Promise<string[]> 
   const now = Date.now();
   
   if (!forceRefresh && cachedSheetNames && (now - cachedSheetNamesTimestamp < CACHE_TTL)) {
-    console.log('⚡ [RAM Cache] Sử dụng danh sách tên sheet lưu trong bộ nhớ');
+    // Đã gỡ bỏ console.log ở đây để tránh spam log khi trúng Cache RAM
     return cachedSheetNames;
   }
 
@@ -227,12 +226,13 @@ export async function findSheetNameWithFallback(requestedName: string): Promise<
 
 /**
  * Đọc dữ liệu từ một sheet cụ thể
+ * Bổ sung tham số skipFallback để tối ưu hóa, tránh gọi vòng lặp redundant
  */
-export async function readSheet(sheetName: string): Promise<Candidate[]> {
+export async function readSheet(sheetName: string, skipFallback = false): Promise<Candidate[]> {
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
-  const actualSheetName = await findSheetNameWithFallback(sheetName);
+  const actualSheetName = skipFallback ? sheetName : await findSheetNameWithFallback(sheetName);
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -263,7 +263,7 @@ export async function readSheet(sheetName: string): Promise<Candidate[]> {
 }
 
 /**
- * Đọc tất cả các sheet và trả về Map
+ * Đọc tất cả các sheet và trả về Map (Đã được tối ưu hóa bỏ qua so khớp dư thừa)
  */
 export async function readAllSheets(): Promise<Map<string, Candidate[]>> {
   const sheetNames = await getAllSheetNames();
@@ -271,7 +271,8 @@ export async function readAllSheets(): Promise<Map<string, Candidate[]>> {
 
   const promises = sheetNames.map(async (name) => {
     try {
-      const candidates = await readSheet(name);
+      // Gán tham số skipFallback = true vì tên sheet này chắc chắn đã chính xác
+      const candidates = await readSheet(name, true);
       return { name, candidates };
     } catch (error) {
       console.error(`Lỗi đọc sheet ${name}:`, error);
