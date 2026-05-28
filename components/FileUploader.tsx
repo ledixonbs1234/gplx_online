@@ -25,7 +25,6 @@ const TARGET_FIELDS = [
   { key: 'name', label: 'Họ và tên', required: true, keywords: ['họ tên', 'ho ten', 'name', 'tên', 'họ và tên'] },
   { key: 'date_of_birth', label: 'Ngày Sinh', required: false, keywords: ['ngày sinh', 'ngay sinh', 'ngày tháng', 'dob', 'date of birth', 'năm sinh', 'ngày tháng sinh', 'ngày tháng năm sinh'] },
   { key: 'phone', label: 'Số Điện Thoại', required: false, keywords: ['số điện thoại', 'so dien thoai', 'phone', 'điện thoại', 'dien thoai'] },
-  // Ưu tiên liên kết từ khóa 'địa chỉ', 'dia chi' về Nơi Nhận bưu điện theo yêu cầu của bạn
   { key: 'receive_location', label: 'Nơi Nhận bưu điện', required: false, keywords: ['nơi nhận', 'noi nhan', 'receive_location', 'nhận', 'địa chỉ', 'dia chi'] }, 
   { key: 'residence', label: 'Nơi Cư Trú', required: false, keywords: ['nơi cư trú', 'noi cu tru', 'residence'] }, 
   { key: 'tracking_number', label: 'Mã Vận Đơn', required: false, keywords: ['mã vận đơn', 'ma van don', 'tracking', 'số hiệu bg'] },
@@ -50,12 +49,11 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   
   const [fieldMap, setFieldMap] = useState<Record<string, number>>({});
   
-  // Cài đặt các giá trị mặc định ban đầu theo cấu hình mới của bạn
   const [defaultValues, setDefaultValues] = useState<Record<string, any>>({
-    has_profile: false,        // Mặc định: Không có hồ sơ
-    exam_status: 'Not_Tested',  // Mặc định: Chưa biết (Chưa thi)
-    has_app_and_fee: false,    // Mặc định: Chưa nộp tiền
-    gplx_status: 'Pending'     // Mặc định: Chờ GPLX
+    has_profile: false,
+    exam_status: 'Not_Tested',
+    has_app_and_fee: false,
+    gplx_status: 'Pending'
   });
 
   const [parsedPreview, setParsedPreview] = useState<any[]>([]);
@@ -133,18 +131,15 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   const handleConfirmHeader = () => {
     if (headerRowIdx === -1) return;
     
-    // Ép kiểu chuỗi an toàn đối với tất cả giá trị ô tiêu đề để tránh lỗi ô trống
     const rawHeaderRow = rawRows[headerRowIdx] || [];
     const headers = rawHeaderRow.map(h => String(h !== undefined && h !== null ? h : '').trim());
     setExcelHeaders(headers);
 
-    // Auto-Mapping khớp nối thông minh
     const initialMapping: Record<string, number> = {};
     TARGET_FIELDS.forEach(field => {
       if (field.isStatic) return;
       
       const index = headers.findIndex(h => {
-        // Chuyển đổi an toàn để không sập khi gặp ô rỗng hoặc undefined
         const lowerH = String(h || '').toLowerCase().trim();
         return field.keywords.some(kw => lowerH === kw || lowerH.includes(kw));
       });
@@ -174,6 +169,30 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       return String(val).trim();
     };
 
+    // Hàm tự động chuẩn hóa và thêm số 0 vào số điện thoại
+    const formatPhoneNumber = (val: any): string => {
+      const rawVal = String(val || '').trim();
+      if (!rawVal) return '';
+
+      // Loại bỏ các ký tự phân tách không mong muốn như khoảng trắng, chấm, gạch ngang
+      let clean = rawVal.replace(/[\s\.\-]/g, '');
+
+      // Nếu số điện thoại bị mất số 0 ở đầu (độ dài 9 số, bắt đầu từ 1 đến 9)
+      if (clean.length === 9 && /^[1-9]\d{8}$/.test(clean)) {
+        clean = '0' + clean;
+      }
+      // Định dạng lại mã quốc gia 84 -> 0
+      else if (clean.startsWith('84') && clean.length === 11) {
+        clean = '0' + clean.slice(2);
+      }
+      // Định dạng lại mã quốc gia +84 -> 0
+      else if (clean.startsWith('+84') && clean.length === 12) {
+        clean = '0' + clean.slice(3);
+      }
+
+      return clean;
+    };
+
     const parseBoolean = (val: any, fallback: boolean): boolean => {
       if (val === undefined || val === null || val === '') return fallback;
       const s = String(val).toLowerCase().trim();
@@ -196,20 +215,21 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       return 'Pending';
     };
 
-    for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
+   for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
       const row = rawRows[i];
       if (!row || row.length === 0) continue;
 
-      const sbdVal = fieldMap['sbd'] !== -1 ? row[fieldMap['sbd']] : '';
-      const nameVal = fieldMap['name'] !== -1 ? row[fieldMap['name']] : '';
+      const sbdVal = fieldMap['sbd'] !== -1 ? String(row[fieldMap['sbd']] || '').trim() : '';
+      const nameVal = fieldMap['name'] !== -1 ? String(row[fieldMap['name']] || '').trim() : '';
 
-      if (!sbdVal && !nameVal) continue;
+      // SỬA LỖI: Bắt buộc dòng dữ liệu phải có cả SBD và Họ Tên để tránh bốc tách nhầm các tiêu đề phụ như "Hạng A1m:"
+      if (!sbdVal || !nameVal) continue; 
 
       previewData.push({
-        sbd: String(sbdVal || '').trim(),
-        name: String(nameVal || '').trim(),
+        sbd: sbdVal,
+        name: nameVal,
         date_of_birth: fieldMap['date_of_birth'] !== -1 ? parseExcelDate(row[fieldMap['date_of_birth']]) : '',
-        phone: fieldMap['phone'] !== -1 ? String(row[fieldMap['phone']] || '').trim() : '',
+        phone: fieldMap['phone'] !== -1 ? formatPhoneNumber(row[fieldMap['phone']]) : '',
         receive_location: fieldMap['receive_location'] !== -1 ? String(row[fieldMap['receive_location']] || '').trim() : '',
         residence: fieldMap['residence'] !== -1 ? String(row[fieldMap['residence']] || '').trim() : '',
         tracking_number: fieldMap['tracking_number'] !== -1 ? String(row[fieldMap['tracking_number']] || '').trim() : '',
@@ -623,7 +643,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
               >
                 {isUploading ? (
                   <>
-                    <Upload className="h-4 w-4 mr-2 animate-spin" />
+                    <Play className="h-4 w-4 mr-2 animate-spin" />
                     ĐANG TIẾN HÀNH ĐỒNG BỘ GOOGLE SHEETS & ĐỊNH DẠNG...
                   </>
                 ) : (
