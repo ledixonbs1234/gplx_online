@@ -56,6 +56,23 @@ function formatAsTextValue(val: string | number | undefined): string {
 }
 
 /**
+ * Chuyển đổi tên sheet ngày tháng sang Object Date để phục vụ sắp xếp
+ */
+function parseSheetNameToDate(name: string): Date {
+  const parts = name.split('-');
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      // yyyy-MM-dd
+      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    } else {
+      // dd-MM-yyyy
+      return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+    }
+  }
+  return new Date(0); // Fallback đối với định dạng không hợp lệ
+}
+
+/**
  * Xóa bộ nhớ đệm danh sách tên sheet khi có thay đổi (ví dụ: tạo sheet mới)
  */
 export function clearSheetNamesCache() {
@@ -96,6 +113,58 @@ export function isValidDateSheetName(name: string): boolean {
   if (day > daysInMonth) return false;
 
   return true;
+}
+
+/**
+ * Sắp xếp lại thứ tự tất cả các sheet trong bảng tính theo trình tự thời gian
+ */
+async function reorderSheetsChronologically(sheets: any, spreadsheetId: string | undefined): Promise<void> {
+  if (!spreadsheetId) return;
+
+  console.log('🔄 Đang tiến hành sắp xếp lại các sheet theo thứ tự thời gian...');
+  
+  // Lấy toàn bộ thông tin các sheet hiện tại
+  const response = await sheets.spreadsheets.get({
+    spreadsheetId,
+  });
+
+  const allSheets = response.data.sheets || [];
+
+  // Phân tách sheet ngày tháng và các sheet khác
+  const dateSheets = allSheets.filter((s: any) => isValidDateSheetName(s.properties.title));
+  const otherSheets = allSheets.filter((s: any) => !isValidDateSheetName(s.properties.title));
+
+  // Sắp xếp các sheet ngày tháng tăng dần (Từ cũ đến mới)
+  // Nếu muốn sắp xếp từ mới đến cũ, bạn có thể đổi thành: dateB - dateA
+  dateSheets.sort((a: any, b: any) => {
+    const dateA = parseSheetNameToDate(a.properties.title).getTime();
+    const dateB = parseSheetNameToDate(b.properties.title).getTime();
+    return dateA - dateB;
+  });
+
+  // Gộp lại danh sách với các sheet ngày tháng nằm phía trước
+  const sortedSheets = [...dateSheets, ...otherSheets];
+
+  // Tạo các yêu cầu cập nhật vị trí index cho từng sheet
+  const requests = sortedSheets.map((sheet: any, index: number) => ({
+    updateSheetProperties: {
+      properties: {
+        sheetId: sheet.properties.sheetId,
+        index: index,
+      },
+      fields: 'index',
+    },
+  }));
+
+  if (requests.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests,
+      },
+    });
+    console.log('✅ Đã sắp xếp vị trí các sheet thành công.');
+  }
 }
 
 /**
@@ -221,7 +290,7 @@ export async function readAllSheets(): Promise<Map<string, Candidate[]>> {
 }
 
 /**
- * Tạo sheet mới cho ngày thi (Thiết lập tự động định dạng Văn bản cho SBD và SĐT)
+ * Tạo sheet mới cho ngày thi (Thiết lập tự động định dạng Văn bản cho SBD và SĐT & Sắp xếp vị trí)
  */
 export async function createNewSheet(sheetName: string): Promise<void> {
   const sheets = getSheetsClient();
@@ -301,6 +370,9 @@ export async function createNewSheet(sheetName: string): Promise<void> {
     valueInputOption: 'RAW',
     requestBody: { values: headers },
   });
+
+  // 4. Sắp xếp lại thứ tự các sheet theo trình tự thời gian
+  await reorderSheetsChronologically(sheets, spreadsheetId);
 
   clearSheetNamesCache();
 }

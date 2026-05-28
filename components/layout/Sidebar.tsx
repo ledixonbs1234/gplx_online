@@ -30,18 +30,18 @@ const menuItems = [
     title: 'Tổng quan',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { label: 'Thống kê', href: '/analytics', icon: BarChart3 },
+      // { label: 'Thống kê', href: '/analytics', icon: BarChart3 },
     ],
   },
   {
     title: 'Quản lý',
     items: [
-      { label: 'Ngày thi', href: '/exam-days', icon: Calendar },
+      // { label: 'Ngày thi', href: '/exam-days', icon: Calendar },
       { label: 'Học viên', href: '/candidates', icon: Users },
       { label: 'Quét mã hiệu', href: '/scanner', icon: QrCode },
       { label: 'Nhập liệu trực tiếp', href: '/update', icon: Edit }, // MENU MỚI TÍCH HỢP Ở ĐÂY
-      { label: 'Upload dữ liệu', href: '/upload', icon: Upload },
-      { label: 'Google Sheets', href: '/sheets', icon: FileSpreadsheet },
+      // { label: 'Upload dữ liệu', href: '/upload', icon: Upload },
+      // { label: 'Google Sheets', href: '/sheets', icon: FileSpreadsheet },
     ],
   },
   {
