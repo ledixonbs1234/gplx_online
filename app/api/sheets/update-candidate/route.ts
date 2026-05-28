@@ -121,9 +121,9 @@ export async function POST(request: Request) {
         values: [rowData],
       },
     });
-
-    // Xóa cache của ngày thi này để cập nhật dữ liệu hiển thị tức thì trên Dashboard
+// Xóa cache của ngày thi này để cập nhật dữ liệu hiển thị tức thì trên Dashboard và Candidates Page
     sheetsCache.delete(`sheets_data_${examDate}`);
+    sheetsCache.delete(`sheets_data_single_${examDate}`);
     sheetsCache.delete('sheets_data_all');
 
     return NextResponse.json({ success: true, message: 'Cập nhật trực tiếp thành công' });

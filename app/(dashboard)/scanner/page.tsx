@@ -116,7 +116,7 @@ export default function ScannerPage() {
   useEffect(() => {
     const loadSheets = async () => {
       try {
-        const response = await fetch('/api/sheets/sync');
+        const response = await fetch('/api/sheets/sync?type=list');
         const result = await response.json();
         if (result.success) {
           setSheetsList(result.sheets || []);

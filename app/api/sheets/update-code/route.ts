@@ -94,6 +94,11 @@ export async function POST(request: Request) {
     // Ghi lại vào Google Sheet
     if (updatedCount > 0) {
       await updateCandidatesInSheet(examDate, updatedCandidates);
+
+      const { sheetsCache } = await import('@/lib/cache');
+      sheetsCache.delete(`sheets_data_${examDate}`);
+      sheetsCache.delete(`sheets_data_single_${examDate}`);
+      sheetsCache.delete('sheets_data_all');
     }
 
     return NextResponse.json({

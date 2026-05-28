@@ -47,7 +47,7 @@ export default function DirectUpdatePage() {
   useEffect(() => {
     const loadSheets = async () => {
       try {
-        const response = await fetch('/api/sheets/sync');
+        const response = await fetch('/api/sheets/sync?type=list');
         const result = await response.json();
         if (result.success && result.sheets && result.sheets.length > 0) {
           setSheetsList(result.sheets);
