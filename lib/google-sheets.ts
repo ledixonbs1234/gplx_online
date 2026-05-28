@@ -1,16 +1,19 @@
+// plx_online/lib/google-sheets.ts
 import { google } from 'googleapis';
 import { Candidate } from '@/types/candidate';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // Singleton pattern để tránh tạo nhiều auth instance
 let sheetsClient: any = null;
+
+// Khởi tạo các biến lưu trữ bộ nhớ đệm RAM (In-Memory Cache) cho tên Sheet
+let cachedSheetNames: string[] | null = null;
+let cachedSheetNamesTimestamp = 0;
+const CACHE_TTL = 3 * 60 * 1000; // Thời gian sống của cache: 3 phút (3 * 60 * 1000ms)
 
 function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
   let credentials;
- // Ưu tiên đọc từ biến môi trường GOOGLE_CREDENTIALS_CONTENT (cho Vercel)
   if (process.env.GOOGLE_CREDENTIALS_CONTENT) {
     try {
       credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_CONTENT);
@@ -18,7 +21,6 @@ function getSheetsClient() {
       throw new Error('Không thể parse biến môi trường GOOGLE_CREDENTIALS_CONTENT. Đảm bảo nội dung là JSON hợp lệ.');
     }
   } else {
-    // Fallback: đọc từ file (cho development local)
     const credentialsPath = process.env.GOOGLE_CREDENTIALS_PATH || './google-credentials.json';
     try {
       const fs = require('fs');
@@ -26,8 +28,7 @@ function getSheetsClient() {
       const absolutePath = path.resolve(credentialsPath);
       credentials = JSON.parse(fs.readFileSync(absolutePath, 'utf-8'));
     } catch (error) {
-      throw new Error(`Không thể đọc file credentials tại: ${credentialsPath}.
-      Hãy đảm bảo file google-credentials.json tồn tại hoặc thiết lập biến môi trường GOOGLE_CREDENTIALS_CONTENT.`);
+      throw new Error(`Không thể đọc file credentials tại: ${credentialsPath}.`);
     }
   }
 
@@ -44,10 +45,29 @@ function getSheetsClient() {
 }
 
 /**
+ * Hàm trợ giúp tự động thêm tiền tố nháy đơn để Google Sheets hiểu là chữ
+ */
+function formatAsTextValue(val: string | number | undefined): string {
+  if (val === undefined || val === null) return '';
+  const str = String(val).trim();
+  if (str === '') return '';
+  if (str.startsWith("'")) return str;
+  return `'${str}`;
+}
+
+/**
+ * Xóa bộ nhớ đệm danh sách tên sheet khi có thay đổi (ví dụ: tạo sheet mới)
+ */
+export function clearSheetNamesCache() {
+  cachedSheetNames = null;
+  cachedSheetNamesTimestamp = 0;
+  console.log('🗑️ [Cache] Đã xóa bộ nhớ đệm danh sách tên Sheet');
+}
+
+/**
  * Kiểm tra xem chuỗi có phải là định dạng ngày hợp lệ không (dd-MM-yyyy hoặc yyyy-MM-dd)
  */
 export function isValidDateSheetName(name: string): boolean {
-  // Kiểm tra định dạng dd-MM-yyyy hoặc yyyy-MM-dd
   const ddMMyyyyRegex = /^\d{2}-\d{2}-\d{4}$/;
   const yyyyMMddRegex = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -59,23 +79,19 @@ export function isValidDateSheetName(name: string): boolean {
   let day: number, month: number, year: number;
 
   if (parts[0].length === 4) {
-    // yyyy-MM-dd
     year = parseInt(parts[0], 10);
     month = parseInt(parts[1], 10);
     day = parseInt(parts[2], 10);
   } else {
-    // dd-MM-yyyy
     day = parseInt(parts[0], 10);
     month = parseInt(parts[1], 10);
     year = parseInt(parts[2], 10);
   }
 
-  // Kiểm tra giá trị hợp lệ
   if (month < 1 || month > 12) return false;
   if (day < 1 || day > 31) return false;
   if (year < 1900 || year > 2100) return false;
 
-  // Kiểm tra số ngày trong tháng
   const daysInMonth = new Date(year, month, 0).getDate();
   if (day > daysInMonth) return false;
 
@@ -83,10 +99,17 @@ export function isValidDateSheetName(name: string): boolean {
 }
 
 /**
- * Lấy danh sách tất cả các Sheet (mỗi sheet = 1 ngày thi)
- * Chỉ trả về các sheet có tên theo định dạng ngày hợp lệ
+ * Lấy danh sách tất cả các Sheet (Sử dụng RAM Cache để tránh vượt định mức Quota Google)
  */
-export async function getAllSheetNames(): Promise<string[]> {
+export async function getAllSheetNames(forceRefresh = false): Promise<string[]> {
+  const now = Date.now();
+  
+  if (!forceRefresh && cachedSheetNames && (now - cachedSheetNamesTimestamp < CACHE_TTL)) {
+    console.log('⚡ [RAM Cache] Sử dụng danh sách tên sheet lưu trong bộ nhớ');
+    return cachedSheetNames;
+  }
+
+  console.log('📡 [Google API] Đang gửi yêu cầu spreadsheets.get lấy danh sách tên sheet mới...');
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
@@ -95,15 +118,10 @@ export async function getAllSheetNames(): Promise<string[]> {
   });
 
   const allSheets = response.data.sheets?.map((sheet: any) => sheet.properties.title) || [];
-
-  // Lọc chỉ lấy các sheet có tên là ngày hợp lệ (dd-MM-yyyy hoặc yyyy-MM-dd)
   const validDateSheets = allSheets.filter((name: string) => isValidDateSheetName(name));
 
-  console.log(`📋 Tổng số sheet: ${allSheets.length}, Sheet có cấu trúc ngày hợp lệ: ${validDateSheets.length}`);
-  if (allSheets.length !== validDateSheets.length) {
-    const invalidSheets = allSheets.filter((name: string) => !isValidDateSheetName(name));
-    console.log(`⚠️ Các sheet bị loại trừ (không có cấu trúc ngày):`, invalidSheets);
-  }
+  cachedSheetNames = validDateSheets;
+  cachedSheetNamesTimestamp = now;
 
   return validDateSheets;
 }
@@ -118,17 +136,14 @@ export async function findSheetNameWithFallback(requestedName: string): Promise<
       return requestedName;
     }
 
-    // Thử đảo định dạng ngày nếu chứa dấu gạch ngang
     const parts = requestedName.split('-');
     if (parts.length === 3) {
       if (parts[0].length === 4) {
-        // yyyy-MM-dd -> Thử tìm: dd-MM-yyyy
         const altName = `${parts[2]}-${parts[1]}-${parts[0]}`;
         if (existingSheets.includes(altName)) {
           return altName;
         }
       } else if (parts[2].length === 4) {
-        // dd-MM-yyyy -> Thử tìm: yyyy-MM-dd
         const altName = `${parts[2]}-${parts[1]}-${parts[0]}`;
         if (existingSheets.includes(altName)) {
           return altName;
@@ -148,7 +163,6 @@ export async function readSheet(sheetName: string): Promise<Candidate[]> {
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
-  // Tự động tìm tên sheet chính xác trong Google Sheets
   const actualSheetName = await findSheetNameWithFallback(sheetName);
 
   const response = await sheets.spreadsheets.values.get({
@@ -159,7 +173,6 @@ export async function readSheet(sheetName: string): Promise<Candidate[]> {
   const rows = response.data.values;
   if (!rows || rows.length === 0) return [];
 
-  // Dòng đầu là header
   const headers = rows[0].map((h: string) => h.toLowerCase().trim());
   const dataRows = rows.slice(1);
 
@@ -187,7 +200,6 @@ export async function readAllSheets(): Promise<Map<string, Candidate[]>> {
   const sheetNames = await getAllSheetNames();
   const result = new Map<string, Candidate[]>();
 
-  // Đọc song song để tăng tốc
   const promises = sheetNames.map(async (name) => {
     try {
       const candidates = await readSheet(name);
@@ -209,14 +221,14 @@ export async function readAllSheets(): Promise<Map<string, Candidate[]>> {
 }
 
 /**
- * Tạo sheet mới cho ngày thi
+ * Tạo sheet mới cho ngày thi (Thiết lập tự động định dạng Văn bản cho SBD và SĐT)
  */
 export async function createNewSheet(sheetName: string): Promise<void> {
   const sheets = getSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
-  // Tạo sheet mới
-  await sheets.spreadsheets.batchUpdate({
+  // 1. Tạo sheet mới
+  const response = await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: {
       requests: [
@@ -231,7 +243,54 @@ export async function createNewSheet(sheetName: string): Promise<void> {
     },
   });
 
-  // Thêm header mới với đầy đủ các trường
+  const sheetId = response.data.replies?.[0]?.addSheet?.properties?.sheetId;
+
+  // 2. Tự động định dạng Cột A (SBD - index 0) và Cột D (SĐT - index 3) thành Văn bản thuần (TEXT)
+  if (sheetId !== undefined && sheetId !== null) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            repeatCell: {
+              range: {
+                sheetId: sheetId,
+                startColumnIndex: 0,
+                endColumnIndex: 1, // Cột A (SBD)
+              },
+              cell: {
+                userEnteredFormat: {
+                  numberFormat: {
+                    type: 'TEXT',
+                  },
+                },
+              },
+              fields: 'userEnteredFormat.numberFormat',
+            },
+          },
+          {
+            repeatCell: {
+              range: {
+                sheetId: sheetId,
+                startColumnIndex: 3,
+                endColumnIndex: 4, // Cột D (Số Điện thoại)
+              },
+              cell: {
+                userEnteredFormat: {
+                  numberFormat: {
+                    type: 'TEXT',
+                  },
+                },
+              },
+              fields: 'userEnteredFormat.numberFormat',
+            },
+          },
+        ],
+      },
+    });
+  }
+
+  // 3. Ghi dữ liệu tiêu đề chính
   const headers = [
     ['SBD', 'Họ tên', 'Ngày Sinh', 'Số Điện Thoại', 'Nơi cư trú', 'Nơi Nhận', 'Mã Vận Đơn', 'Có hồ sơ', 'Kết quả thi', 'Đã Nộp Tiền', 'Trạng thái GPLX', 'Đã Up Portal'],
   ];
@@ -242,10 +301,12 @@ export async function createNewSheet(sheetName: string): Promise<void> {
     valueInputOption: 'RAW',
     requestBody: { values: headers },
   });
+
+  clearSheetNamesCache();
 }
 
 /**
- * Ghi dữ liệu vào một sheet
+ * Ghi dữ liệu vào một sheet cụ thể
  */
 export async function writeToSheet(sheetName: string, candidates: Candidate[]): Promise<void> {
   const sheets = getSheetsClient();
@@ -254,10 +315,10 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
   const actualSheetName = await findSheetNameWithFallback(sheetName);
 
   const values = candidates.map((c) => [
-    c.sbd,
+    formatAsTextValue(c.sbd),
     c.name,
     c.date_of_birth || '',
-    c.phone || '',
+    formatAsTextValue(c.phone),
     c.residence || '',
     c.receive_location || '',
     c.tracking_number || '',
@@ -271,7 +332,7 @@ export async function writeToSheet(sheetName: string, candidates: Candidate[]): 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `'${actualSheetName}'!A2:L${values.length + 1}`,
-    valueInputOption: 'RAW',
+    valueInputOption: 'USER_ENTERED',
     requestBody: { values },
   });
 }
@@ -286,12 +347,11 @@ export async function updateCandidatesInSheet(sheetName: string, candidates: Can
   const actualSheetName = await findSheetNameWithFallback(sheetName);
   const lastRow = candidates.length + 1;
 
-  // Chuẩn bị dữ liệu mới
   const values = candidates.map((c) => [
-    c.sbd,
+    formatAsTextValue(c.sbd),
     c.name,
     c.date_of_birth || '',
-    c.phone || '',
+    formatAsTextValue(c.phone),
     c.residence || '',
     c.receive_location || '',
     c.tracking_number || '',
@@ -302,7 +362,6 @@ export async function updateCandidatesInSheet(sheetName: string, candidates: Can
     c.has_postal_up ? 'Có' : 'Không',
   ]);
 
-  // Xóa dữ liệu cũ và ghi mới
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
     range: `'${actualSheetName}'!A2:L1000`,
@@ -312,7 +371,7 @@ export async function updateCandidatesInSheet(sheetName: string, candidates: Can
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `'${actualSheetName}'!A2:L${lastRow}`,
-      valueInputOption: 'RAW',
+      valueInputOption: 'USER_ENTERED',
       requestBody: { values },
     });
   }
@@ -323,7 +382,12 @@ function getCellValue(row: any[], headers: string[], possibleNames: string[]): s
   for (const name of possibleNames) {
     const index = headers.indexOf(name.toLowerCase());
     if (index !== -1 && row[index] !== undefined) {
-      return String(row[index]).trim();
+      let val = String(row[index]).trim();
+      // Loại bỏ dấu nháy đơn nếu tồn tại để xử lý dữ liệu sạch trong app
+      if (val.startsWith("'")) {
+        val = val.slice(1);
+      }
+      return val;
     }
   }
   return '';
@@ -332,7 +396,7 @@ function getCellValue(row: any[], headers: string[], possibleNames: string[]): s
 function parseBool(value: string): boolean {
   if (!value) return false;
   const lower = value.toLowerCase();
-  return ['có', 'co', 'yes', 'true', '1', 'có'].includes(lower);
+  return ['có', 'co', 'yes', 'true', '1'].includes(lower);
 }
 
 function parseExamStatus(value: string): 'Pass' | 'Fail' | 'Not_Tested' {
