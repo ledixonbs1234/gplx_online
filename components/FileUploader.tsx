@@ -169,23 +169,18 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       return String(val).trim();
     };
 
-    // Hàm tự động chuẩn hóa và thêm số 0 vào số điện thoại
     const formatPhoneNumber = (val: any): string => {
       const rawVal = String(val || '').trim();
       if (!rawVal) return '';
 
-      // Loại bỏ các ký tự phân tách không mong muốn như khoảng trắng, chấm, gạch ngang
       let clean = rawVal.replace(/[\s\.\-]/g, '');
 
-      // Nếu số điện thoại bị mất số 0 ở đầu (độ dài 9 số, bắt đầu từ 1 đến 9)
       if (clean.length === 9 && /^[1-9]\d{8}$/.test(clean)) {
         clean = '0' + clean;
       }
-      // Định dạng lại mã quốc gia 84 -> 0
       else if (clean.startsWith('84') && clean.length === 11) {
         clean = '0' + clean.slice(2);
       }
-      // Định dạng lại mã quốc gia +84 -> 0
       else if (clean.startsWith('+84') && clean.length === 12) {
         clean = '0' + clean.slice(3);
       }
@@ -215,27 +210,42 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
       return 'Pending';
     };
 
-   for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
+    for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
       const row = rawRows[i];
       if (!row || row.length === 0) continue;
 
       const sbdVal = fieldMap['sbd'] !== -1 ? String(row[fieldMap['sbd']] || '').trim() : '';
       const nameVal = fieldMap['name'] !== -1 ? String(row[fieldMap['name']] || '').trim() : '';
 
-      // SỬA LỖI: Bắt buộc dòng dữ liệu phải có cả SBD và Họ Tên để tránh bốc tách nhầm các tiêu đề phụ như "Hạng A1m:"
       if (!sbdVal || !nameVal) continue; 
+
+      const phoneVal = fieldMap['phone'] !== -1 ? formatPhoneNumber(row[fieldMap['phone']]) : '';
+
+      let examStatusVal = fieldMap['exam_status'] !== undefined && fieldMap['exam_status'] !== -1 
+        ? parseExamStatus(row[fieldMap['exam_status']], defaultValues.exam_status) 
+        : defaultValues.exam_status;
+
+      let hasAppAndFeeVal = fieldMap['has_app_and_fee'] !== undefined && fieldMap['has_app_and_fee'] !== -1 
+        ? parseBoolean(row[fieldMap['has_app_and_fee']], defaultValues.has_app_and_fee) 
+        : defaultValues.has_app_and_fee;
+
+      // NÂNG CẤP ĐỒNG BỘ: Nếu có số điện thoại, kết quả thi tự động là "Pass" (Đậu) & trạng thái nộp tiền là true (Đã nộp)
+      if (phoneVal !== '') {
+        examStatusVal = 'Pass';
+        hasAppAndFeeVal = true;
+      }
 
       previewData.push({
         sbd: sbdVal,
         name: nameVal,
         date_of_birth: fieldMap['date_of_birth'] !== -1 ? parseExcelDate(row[fieldMap['date_of_birth']]) : '',
-        phone: fieldMap['phone'] !== -1 ? formatPhoneNumber(row[fieldMap['phone']]) : '',
+        phone: phoneVal,
         receive_location: fieldMap['receive_location'] !== -1 ? String(row[fieldMap['receive_location']] || '').trim() : '',
         residence: fieldMap['residence'] !== -1 ? String(row[fieldMap['residence']] || '').trim() : '',
         tracking_number: fieldMap['tracking_number'] !== -1 ? String(row[fieldMap['tracking_number']] || '').trim() : '',
         has_profile: fieldMap['has_profile'] !== undefined && fieldMap['has_profile'] !== -1 ? parseBoolean(row[fieldMap['has_profile']], defaultValues.has_profile) : defaultValues.has_profile,
-        exam_status: fieldMap['exam_status'] !== undefined && fieldMap['exam_status'] !== -1 ? parseExamStatus(row[fieldMap['exam_status']], defaultValues.exam_status) : defaultValues.exam_status,
-        has_app_and_fee: fieldMap['has_app_and_fee'] !== undefined && fieldMap['has_app_and_fee'] !== -1 ? parseBoolean(row[fieldMap['has_app_and_fee']], defaultValues.has_app_and_fee) : defaultValues.has_app_and_fee,
+        exam_status: examStatusVal,
+        has_app_and_fee: hasAppAndFeeVal,
         gplx_status: fieldMap['gplx_status'] !== undefined && fieldMap['gplx_status'] !== -1 ? parseGplxStatus(row[fieldMap['gplx_status']], defaultValues.gplx_status) : defaultValues.gplx_status,
         exam_date: formattedDate
       });

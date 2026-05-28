@@ -88,17 +88,29 @@ export async function POST(request: Request) {
     const phoneIdx = getColIdx(['số điện thoại', 'so dien thoai', 'phone', 'điện thoại', 'dien thoai']);
     const residenceIdx = getColIdx(['nơi cư trú', 'noi cu tru', 'residence', 'địa chỉ', 'dia chi']);
     const receiveLocationIdx = getColIdx(['nơi nhận', 'noi nhan', 'receive_location']);
+    const examStatusIdx = getColIdx(['kết quả thi', 'ket qua thi', 'exam_status']);
+    const hasAppAndFeeIdx = getColIdx(['đã nộp tiền', 'da nop tien', 'đk app + tiền', 'dk app', 'has_app_and_fee']);
 
     // Cập nhật giá trị mới vào dòng dữ liệu và tự động thêm tiền tố nháy đơn
     if (phoneIdx !== -1) {
       const phoneVal = phone ? String(phone).trim() : '';
       if (phoneVal) {
         rowData[phoneIdx] = phoneVal.startsWith("'") ? phoneVal : `'${phoneVal}`;
+        
+        // 1. Tự động chuyển Kết quả thi sang "Đậu"
+        if (examStatusIdx !== -1) {
+          rowData[examStatusIdx] = 'Đậu';
+        }
+
+        // 2. Tự động chuyển trạng thái Đăng ký app/Đã nộp tiền sang "Có"
+        if (hasAppAndFeeIdx !== -1) {
+          rowData[hasAppAndFeeIdx] = 'Có';
+        }
       } else {
         rowData[phoneIdx] = '';
       }
     }
-    // if (residenceIdx !== -1) rowData[residenceIdx] = residence || '';
+    
     if (receiveLocationIdx !== -1) rowData[receiveLocationIdx] = residence || '';
 
     // Đồng bộ đảm bảo SBD dòng này cũng giữ nguyên tiền tố nháy đơn

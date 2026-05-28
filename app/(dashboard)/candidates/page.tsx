@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar as CalendarIcon, Users, FileSpreadsheet, Search, ExternalLink, Upload, CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
@@ -36,32 +37,93 @@ interface ExcelRow {
   code?: string;
 }
 
+interface IncompleteRecord {
+  rawText: string;
+  sbd: string;
+  fullName: string;
+  dateOfBirth: string;
+  code: string;
+  selectedSheet: string;
+}
+
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag-vDGsZgmH4rX_TicLtVwD-y696bgk/edit?usp=sharing';
 
+/**
+ * Hàm phân tích thông tin người nhận theo thuật toán nâng cấp
+ */
 function parseRecipient(text: string) {
   const cleaned = text.trim();
-  if (!cleaned) return { sbd: '', name: '', dob: '' };
+  if (!cleaned) return { sbd: '', name: '', dob: '', isValid: false };
 
-  const parts = cleaned.split(/\s+/);
   let sbd = '';
   let dob = '';
-  let nameParts = [...parts];
+  let name = '';
 
-  if (/^\d+$/.test(parts[0])) {
-    sbd = parts[0];
-    nameParts.shift();
-  }
+  // Phân tách chuỗi thô thành các từ (tokens)
+  const tokens = cleaned.split(/\s+/);
 
-  if (nameParts.length > 0) {
-    const lastToken = nameParts[nameParts.length - 1];
-    if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(lastToken) || /^\d{5}$/.test(lastToken)) {
-      dob = lastToken;
-      nameParts.pop();
+  // 1. Phát hiện và xử lý Ngày Sinh (chứa ký tự '/' và có số)
+  const dobIndex = tokens.findIndex(t => t.includes('/') && /\d/.test(t));
+  if (dobIndex !== -1) {
+    const rawDob = tokens[dobIndex];
+    // Loại bỏ các ký tự chữ cái hoặc dấu ngoặc quanh ngày sinh (ví dụ: "12/05/1995(A1)" -> "12/05/1995")
+    const cleanDob = rawDob.replace(/[^\d/]/g, '');
+    const dateParts = cleanDob.split('/');
+    
+    if (dateParts.length === 3) {
+      let day = dateParts[0].trim();
+      let month = dateParts[1].trim();
+      let year = dateParts[2].trim();
+
+      // Chuẩn hóa ngày (đảm bảo 2 chữ số)
+      if (day.length === 1) day = '0' + day;
+      else if (day.length > 2) day = day.slice(-2);
+
+      // Chuẩn hóa tháng (đảm bảo 2 chữ số)
+      if (month.length === 1) month = '0' + month;
+      else if (month.length > 2) month = month.slice(-2);
+
+      // Chuẩn hóa năm (đảm bảo 4 chữ số)
+      if (year.length === 2) {
+        const yNum = parseInt(year, 10);
+        year = (yNum > 30 ? '19' : '20') + year;
+      } else if (year.length === 1) {
+        year = '200' + year;
+      } else if (year.length === 3) {
+        year = '2' + year;
+      }
+
+      if (day.length === 2 && month.length === 2 && year.length === 4) {
+        dob = `${day}/${month}/${year}`;
+      } else {
+        dob = cleanDob; // Giữ lại giá trị sạch nếu không thể chuẩn hóa hoàn chỉnh
+      }
+    } else {
+      dob = cleanDob;
     }
+    // Xóa token ngày sinh khỏi mảng để không ảnh hưởng phân tích các trường khác
+    tokens.splice(dobIndex, 1);
   }
 
-  const name = nameParts.join(' ').trim();
-  return { sbd, name, dob };
+  // 2. Phát hiện Số báo danh (SBD) là số tối đa 4 chữ số
+  const sbdIndex = tokens.findIndex(t => /^\d{1,4}$/.test(t));
+  if (sbdIndex !== -1) {
+    sbd = tokens[sbdIndex];
+    tokens.splice(sbdIndex, 1);
+  }
+
+  // 3. Phát hiện Tên (là chữ, không chứa số)
+  const nameParts = tokens.filter(t => !/\d/.test(t) && /[a-zA-Zà-ỹÀ-ỸđĐ]/.test(t));
+  name = nameParts.join(' ').trim();
+
+  // Xác minh tính chính xác của cả 3 trường
+  const hasSbd = sbd !== '';
+  const hasName = name !== '' && name.length >= 2;
+  const hasDob = dob !== '' && dob.includes('/');
+
+  const isValid = hasSbd && hasName && hasDob;
+
+  return { sbd, name, dob, isValid };
 }
 
 export default function CandidatesPage() {
@@ -76,6 +138,10 @@ export default function CandidatesPage() {
   const [updateResult, setUpdateResult] = useState<{ success: boolean; message: string; updatedCount?: number } | null>(null);
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [unmatched, setUnmatched] = useState<any[]>([]);
+  
+  // Quản lý danh sách bản ghi thiếu thông tin cần xử lý thủ công
+  const [incompleteRecords, setIncompleteRecords] = useState<IncompleteRecord[]>([]);
+  const [isResolvingIncomplete, setIsResolvingIncomplete] = useState<number | null>(null);
   const [isResolvingConflict, setIsResolvingConflict] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -152,6 +218,7 @@ export default function CandidatesPage() {
     setUpdateResult(null);
     setConflicts([]);
     setUnmatched([]);
+    setIncompleteRecords([]);
 
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -163,6 +230,9 @@ export default function CandidatesPage() {
       const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       
       const excelData: ExcelRow[] = [];
+      const incompleteList: IncompleteRecord[] = [];
+      const defaultDateStr = selectedDate ? format(selectedDate, 'dd-MM-yyyy') : (sheetsList[0] || '');
+
       for (let i = 2; i < rawData.length; i++) {
         const row = rawData[i];
         if (!row || row.length === 0) continue;
@@ -171,45 +241,67 @@ export default function CandidatesPage() {
         if (!recipientVal) continue;
 
         const code = row[12] ? String(row[12]).trim() : '';
-        
         const parsed = parseRecipient(recipientVal);
-        if (parsed.name || parsed.sbd) {
+        
+        if (parsed.isValid) {
+          // Trường hợp phát hiện chính xác cả 3 trường
           excelData.push({
             sbd: parsed.sbd,
             fullName: parsed.name,
             dateOfBirth: parsed.dob,
             code,
           });
+        } else {
+          // Trường hợp thiếu ít nhất 1 trường thông tin
+          incompleteList.push({
+            rawText: recipientVal,
+            sbd: parsed.sbd || '',
+            fullName: parsed.name || '',
+            dateOfBirth: parsed.dob || '',
+            code,
+            selectedSheet: defaultDateStr,
+          });
         }
       }
 
-      if (excelData.length === 0) {
+      setIncompleteRecords(incompleteList);
+
+      if (excelData.length === 0 && incompleteList.length === 0) {
         setUpdateResult({ success: false, message: 'Không tìm thấy dữ liệu khả dụng từ hàng 3 trở đi trong file Excel' });
         setIsUpdatingCode(false);
         return;
       }
 
-      const response = await fetch('/api/sheets/update-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ excelData }),
-      });
+      // Chỉ tiến hành cập nhật tự động qua API nếu có bản ghi hợp lệ chứa đủ 3 trường
+      if (excelData.length > 0) {
+        const response = await fetch('/api/sheets/update-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ excelData }),
+        });
 
-      const result = await response.json();
-      
-      if (result.success) {
+        const result = await response.json();
+        
+        if (result.success) {
+          setUpdateResult({
+            success: true,
+            message: `Xử lý hoàn tất! Đã cập nhật tự động thành công cho ${result.autoUpdatedCount} học viên khớp duy nhất. Hãy kiểm tra các bản ghi thiếu thông tin cần xử lý thủ công bên dưới.`,
+            updatedCount: result.autoUpdatedCount,
+          });
+          
+          setConflicts(result.conflicts || []);
+          setUnmatched(result.unmatched || []);
+          
+          await loadCandidates();
+        } else {
+          setUpdateResult({ success: false, message: result.error || 'Xảy ra lỗi trong lúc phân tích dữ liệu bưu điện' });
+        }
+      } else {
         setUpdateResult({
           success: true,
-          message: `Xử lý hoàn tất! Đã cập nhật tự động thành công cho ${result.autoUpdatedCount} học viên khớp duy nhất.`,
-          updatedCount: result.autoUpdatedCount,
+          message: `Không có học viên nào đủ cả 3 trường thông tin để đối chiếu tự động. Vui lòng xử lý thủ công các bản ghi bên dưới.`,
+          updatedCount: 0
         });
-        
-        setConflicts(result.conflicts || []);
-        setUnmatched(result.unmatched || []);
-        
-        await loadCandidates();
-      } else {
-        setUpdateResult({ success: false, message: result.error || 'Xảy ra lỗi trong lúc phân tích dữ liệu bưu điện' });
       }
     } catch (error: any) {
       console.error('Lỗi tải dữ liệu Excel:', error);
@@ -249,6 +341,48 @@ export default function CandidatesPage() {
     }
   };
 
+  /**
+   * Cập nhật thủ công cho bản ghi thiếu trường thông tin
+   */
+  const handleResolveIncomplete = async (index: number) => {
+    const record = incompleteRecords[index];
+    if (!record.sbd.trim()) {
+      alert('Vui lòng điền Số báo danh (SBD) để có thể xác định học viên!');
+      return;
+    }
+    if (!record.selectedSheet) {
+      alert('Vui lòng chọn ngày thi chứa dữ liệu học viên cần cập nhật!');
+      return;
+    }
+
+    setIsResolvingIncomplete(index);
+    try {
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'resolve_conflict',
+          sheetName: record.selectedSheet,
+          sbd: record.sbd.trim(),
+          code: record.code,
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        alert('Cập nhật mã hiệu thủ công thành công!');
+        setIncompleteRecords(prev => prev.filter((_, idx) => idx !== index));
+        await loadCandidates();
+      } else {
+        alert(`Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Không thể lưu mã hiệu bưu điện thủ công');
+    } finally {
+      setIsResolvingIncomplete(null);
+    }
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -276,8 +410,8 @@ export default function CandidatesPage() {
           c.name,
           c.date_of_birth || '',
           c.phone || '',
-          c.receive_location || '', // Nơi Nhận đứng trước
-          c.residence || '',        // Nơi Cư Trú đứng sau
+          c.receive_location || '',
+          c.residence || '',
           c.tracking_number || '',
           c.exam_status === 'Pass' ? 'Đậu' : c.exam_status === 'Fail' ? 'Rớt' : 'Chưa thi',
           c.has_app_and_fee ? 'Đã Nộp' : 'Chưa Nộp',
@@ -396,9 +530,15 @@ export default function CandidatesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Dữ liệu Excel hợp lệ: Bắt đầu từ **Hàng 3**, cột **E (Tên người nhận)** chứa thông tin học viên (Hỗ trợ tự động bóc tách SBD, Tên, Ngày Sinh), cột **M (Số hiệu BG)** là mã hiệu cần lấy.
-            </p>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>📍 <strong>Tiêu chí nhận diện tự động (Yêu cầu nhận dạng đủ 3 trường):</strong></p>
+              <ul className="list-disc list-inside pl-2">
+                <li><strong>SBD:</strong> Là dạng số, độ dài tối đa 4 ký tự.</li>
+                <li><strong>Họ Tên:</strong> Là dạng chữ cái không chứa số.</li>
+                <li><strong>Ngày Sinh:</strong> Nhận diện khi phần tử chứa ký tự gạch chéo <code>/</code> và tự động chuẩn hóa về dạng <code>dd/MM/yyyy</code>.</li>
+              </ul>
+              <p className="mt-1">Dữ liệu thô đọc từ <strong>Hàng 3, cột E (Tên người nhận)</strong> và mã hiệu ở <strong>cột M (Số hiệu BG)</strong>.</p>
+            </div>
             <div className="flex gap-2">
               <input
                 ref={fileInputRef}
@@ -425,6 +565,114 @@ export default function CandidatesPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Danh sách các bản ghi thiếu thông tin (< 3 trường) cần xử lý thủ công */}
+        {incompleteRecords.length > 0 && (
+          <Card className="border-amber-200 bg-amber-50/50">
+            <CardHeader>
+              <CardTitle className="text-amber-800 text-base font-bold flex items-center gap-2">
+                ⚠️ Bản ghi thiếu thông tin - Cần xử lý thủ công ({incompleteRecords.length})
+              </CardTitle>
+              <p className="text-xs text-amber-700">
+                Các bản ghi dưới đây không chứa đủ 3 trường dữ liệu (SBD tối đa 4 số, Tên chữ, Ngày sinh có ký tự /) để đối chiếu tự động. Bạn vui lòng bổ sung thông tin chính xác, chọn ngày thi hợp lệ và bấm lưu:
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-amber-100 text-amber-900 sticky top-0">
+                    <tr className="text-left">
+                      <th className="py-2 px-3">Dữ liệu thô Excel</th>
+                      <th className="py-2 px-3">Số báo danh (SBD)</th>
+                      <th className="py-2 px-3">Họ và Tên</th>
+                      <th className="py-2 px-3">Ngày Sinh</th>
+                      <th className="py-2 px-3">Mã Hiệu (Cột M)</th>
+                      <th className="py-2 px-3">Ngày thi</th>
+                      <th className="py-2 px-3 text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {incompleteRecords.map((record, idx) => (
+                      <tr key={idx} className="border-b border-amber-200 hover:bg-amber-100/30">
+                        <td className="py-2 px-3 text-xs font-mono max-w-[200px] truncate" title={record.rawText}>
+                          {record.rawText}
+                        </td>
+                        <td className="py-2 px-3">
+                          <Input
+                            placeholder="Nhập SBD"
+                            value={record.sbd}
+                            className="w-24 bg-white h-8 text-xs font-mono"
+                            onChange={(e) => {
+                              const updated = [...incompleteRecords];
+                              updated[idx].sbd = e.target.value;
+                              setIncompleteRecords(updated);
+                            }}
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Input
+                            placeholder="Nhập Tên"
+                            value={record.fullName}
+                            className="w-40 bg-white h-8 text-xs"
+                            onChange={(e) => {
+                              const updated = [...incompleteRecords];
+                              updated[idx].fullName = e.target.value;
+                              setIncompleteRecords(updated);
+                            }}
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <Input
+                            placeholder="dd/MM/yyyy"
+                            value={record.dateOfBirth}
+                            className="w-28 bg-white h-8 text-xs"
+                            onChange={(e) => {
+                              const updated = [...incompleteRecords];
+                              updated[idx].dateOfBirth = e.target.value;
+                              setIncompleteRecords(updated);
+                            }}
+                          />
+                        </td>
+                        <td className="py-2 px-3 font-mono text-xs">{record.code || '-'}</td>
+                        <td className="py-2 px-3">
+                          <Select
+                            value={record.selectedSheet}
+                            onValueChange={(val) => {
+                              const updated = [...incompleteRecords];
+                              updated[idx].selectedSheet = val;
+                              setIncompleteRecords(updated);
+                            }}
+                          >
+                            <SelectTrigger className="w-32 bg-white h-8 text-xs">
+                              <SelectValue placeholder="Chọn ngày thi" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sheetsList.map((sheet) => (
+                                <SelectItem key={sheet} value={sheet} className="text-xs">
+                                  {sheet}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <Button
+                            size="sm"
+                            className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs h-8 px-3"
+                            onClick={() => handleResolveIncomplete(idx)}
+                            disabled={isResolvingIncomplete === idx}
+                          >
+                            {isResolvingIncomplete === idx ? '⏳' : 'Lưu'}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {conflicts.length > 0 && (
           <Card className="border-amber-200 bg-amber-50/50">
