@@ -8,7 +8,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarIcon, Users, FileSpreadsheet, Search, ExternalLink, Upload, CheckCircle2, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
+import { 
+  Calendar as CalendarIcon, 
+  Users, 
+  FileSpreadsheet, 
+  Search, 
+  ExternalLink, 
+  Upload, 
+  CheckCircle2, 
+  AlertCircle, 
+  RefreshCw, 
+  Trash2,
+  SlidersHorizontal,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Phone,
+  MapPin
+} from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -44,7 +61,7 @@ interface IncompleteRecord {
   dateOfBirth: string;
   code: string;
   selectedSheet: string;
-  recordKey?: string; // Mã khóa Firebase để định vị khi xóa
+  recordKey?: string;
 }
 
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag-vDGsZgmH4rX_TicLtVwD-y696bgk/edit?usp=sharing';
@@ -120,12 +137,20 @@ export default function CandidatesPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sheetsList, setSheetsList] = useState<string[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  
+  // --- Các States bộ lọc tìm kiếm đa điều kiện ---
+  const [searchTerm, setSearchTerm] = useState(''); // Lọc Họ tên / SBD
+  const [filterPhoneCode, setFilterPhoneCode] = useState(''); // Lọc Số điện thoại / Mã vận đơn
+  const [filterAddress, setFilterAddress] = useState(''); // Lọc Nơi nhận / Nơi cư trú
+  const [filterExamStatus, setFilterExamStatus] = useState<string>('all'); // Lọc kết quả thi
+  const [filterHasProfile, setFilterHasProfile] = useState<string>('all'); // Lọc hồ sơ
+  const [filterHasFee, setFilterHasFee] = useState<string>('all'); // Lọc đóng tiền
+  const [filterGplxStatus, setFilterGplxStatus] = useState<string>('all'); // Lọc GPLX
+  const [showAdvanced, setShowAdvanced] = useState(false); // Trạng thái mở rộng bộ lọc
   
   const [isUpdatingCode, setIsUpdatingCode] = useState(false);
   const [updateResult, setUpdateResult] = useState<{ success: boolean; message: string; updatedCount?: number } | null>(null);
   
-  // Danh sách từ Firebase DB
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [incompleteRecords, setIncompleteRecords] = useState<IncompleteRecord[]>([]);
   const [unmatched, setUnmatched] = useState<any[]>([]);
@@ -149,7 +174,6 @@ export default function CandidatesPage() {
     return new Date(sheetName);
   };
 
-  // Nạp đồng thời cả 3 danh sách từ Firebase Database về máy
   const loadStoredRecords = async () => {
     try {
       const response = await fetch('/api/sheets/update-code');
@@ -177,7 +201,7 @@ export default function CandidatesPage() {
       }
     };
     loadSheets();
-    loadStoredRecords(); // Tải tự động dữ liệu cũ đã lưu từ Firebase
+    loadStoredRecords();
   }, []);
 
   const loadCandidates = async () => {
@@ -205,10 +229,62 @@ export default function CandidatesPage() {
     loadCandidates();
   }, [selectedDate]);
 
-  const filteredCandidates = candidates.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.sbd.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // --- Kiểm tra xem có đang áp dụng bất kỳ bộ lọc nào không ---
+  const hasAnyFilterApplied = 
+    searchTerm !== '' || 
+    filterPhoneCode !== '' || 
+    filterAddress !== '' || 
+    filterExamStatus !== 'all' || 
+    filterHasProfile !== 'all' || 
+    filterHasFee !== 'all' || 
+    filterGplxStatus !== 'all';
+
+  // --- Reset tất cả bộ lọc về trạng thái ban đầu ---
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setFilterPhoneCode('');
+    setFilterAddress('');
+    setFilterExamStatus('all');
+    setFilterHasProfile('all');
+    setFilterHasFee('all');
+    setFilterGplxStatus('all');
+  };
+
+  // --- Thực hiện lọc dữ liệu dựa trên nhiều điều kiện (Multi-Field Filtering) ---
+  const filteredCandidates = candidates.filter(c => {
+    // 1. Tìm theo Họ tên hoặc Số báo danh
+    const matchNameSbd = !searchTerm.trim() || 
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.sbd.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // 2. Tìm theo Số điện thoại hoặc Mã vận đơn bưu điện
+    const matchPhoneCode = !filterPhoneCode.trim() ||
+      (c.phone && c.phone.toLowerCase().includes(filterPhoneCode.toLowerCase())) ||
+      (c.tracking_number && c.tracking_number.toLowerCase().includes(filterPhoneCode.toLowerCase()));
+
+    // 3. Tìm theo Địa chỉ nhận hoặc Nơi cư trú
+    const matchAddress = !filterAddress.trim() ||
+      (c.receive_location && c.receive_location.toLowerCase().includes(filterAddress.toLowerCase())) ||
+      (c.residence && c.residence.toLowerCase().includes(filterAddress.toLowerCase()));
+
+    // 4. Lọc theo Kết quả thi
+    const matchExamStatus = filterExamStatus === 'all' || c.exam_status === filterExamStatus;
+
+    // 5. Lọc theo Hồ sơ
+    const matchProfile = filterHasProfile === 'all' || 
+      (filterHasProfile === 'true' && c.has_profile) || 
+      (filterHasProfile === 'false' && !c.has_profile);
+
+    // 6. Lọc theo Đăng ký app & Đã nộp tiền
+    const matchFee = filterHasFee === 'all' || 
+      (filterHasFee === 'true' && c.has_app_and_fee) || 
+      (filterHasFee === 'false' && !c.has_app_and_fee);
+
+    // 7. Lọc theo Trạng thái GPLX
+    const matchGplx = filterGplxStatus === 'all' || c.gplx_status === filterGplxStatus;
+
+    return matchNameSbd && matchPhoneCode && matchAddress && matchExamStatus && matchProfile && matchFee && matchGplx;
+  });
 
   const stats = {
     total: filteredCandidates.length,
@@ -298,7 +374,6 @@ export default function CandidatesPage() {
         return;
       }
 
-      // Nâng cấp: Gửi đồng thời cả danh sách thiếu (incompleteList) để lưu vào database
       const response = await fetch('/api/sheets/update-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -314,7 +389,7 @@ export default function CandidatesPage() {
           updatedCount: result.autoUpdatedCount,
         });
         
-        await loadStoredRecords(); // Nạp lại cả 3 danh sách mới nhất từ Firebase DB
+        await loadStoredRecords();
         await loadCandidates();
       } else {
         setUpdateResult({ success: false, message: result.error || 'Xảy ra lỗi trong lúc phân tích dữ liệu bưu điện' });
@@ -380,7 +455,7 @@ export default function CandidatesPage() {
           sbd: record.sbd.trim() || undefined,
           fullName: record.fullName.trim() || undefined,
           code: record.code,
-          recordKey: record.recordKey, // Truyền thêm key để tự động xóa trong incomplete_records của Firebase
+          recordKey: record.recordKey,
         }),
       });
       const result = await response.json();
@@ -399,7 +474,6 @@ export default function CandidatesPage() {
     }
   };
 
-  // --- CÁC HÀM XÓA PHÁT SINH MỚI CHO BẢN GHI TRÙNG KHỚP ---
   const handleDeleteConflict = async (conflictKey: string, index: number) => {
     if (!confirm('Bạn có chắc chắn muốn xóa bản ghi xung đột này? (Dữ liệu học viên gốc trên Google Sheets vẫn được giữ nguyên)')) return;
 
@@ -442,7 +516,6 @@ export default function CandidatesPage() {
     }
   };
 
-  // --- CÁC HÀM XÓA PHÁT SINH MỚI CHO BẢN GHI THIẾU THÔNG TIN ---
   const handleDeleteIncomplete = async (recordKey: string, index: number) => {
     if (!confirm('Bạn có chắc chắn muốn xóa bản ghi thiếu thông tin này khỏi danh sách Database?')) return;
 
@@ -485,7 +558,6 @@ export default function CandidatesPage() {
     }
   };
 
-  // --- CÁC HÀM XÓA PHÁT SINH MỚI CHO BẢN GHI KHÔNG TỒN TẠI (UNMATCHED) ---
   const handleDeleteUnmatched = async (unmatchedKey: string, index: number) => {
     if (!confirm('Bạn có chắc chắn muốn xóa bản ghi không tồn tại này khỏi danh sách Database?')) return;
 
@@ -598,7 +670,9 @@ export default function CandidatesPage() {
       />
 
       <div className="p-4 lg:p-8 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        {/* Hàng 1: Thao tác & Đồng bộ ngày thi */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -632,23 +706,6 @@ export default function CandidatesPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Search className="h-4 w-4" />
-                Tìm kiếm học viên
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Input
-                placeholder="Nhập tên hoặc mã HV..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <FileSpreadsheet className="h-4 w-4 text-green-600" />
                 Google Sheets
               </CardTitle>
@@ -667,6 +724,145 @@ export default function CandidatesPage() {
           </Card>
         </div>
 
+        {/* Bảng điều khiển bộ lọc tìm kiếm đa điều kiện nâng cao */}
+        <Card className="border-indigo-100 bg-indigo-50/10">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-indigo-700">
+              <SlidersHorizontal className="h-4 w-4" />
+              Bộ lọc tìm kiếm đa điều kiện
+            </CardTitle>
+            <div className="flex gap-2">
+              {hasAnyFilterApplied && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleResetFilters}
+                  className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Xóa bộ lọc
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="h-8 text-xs font-semibold"
+              >
+                {showAdvanced ? (
+                  <span className="flex items-center gap-1">Thu gọn <ChevronUp className="h-3.5 w-3.5" /></span>
+                ) : (
+                  <span className="flex items-center gap-1">Mở rộng lọc nâng cao <ChevronDown className="h-3.5 w-3.5" /></span>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Bộ lọc văn bản chính */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Tên hoặc SBD học viên</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Nhập tên hoặc SBD..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">SĐT hoặc Mã vận đơn</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Nhập số điện thoại hoặc mã bưu..."
+                    value={filterPhoneCode}
+                    onChange={(e) => setFilterPhoneCode(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Nơi nhận hoặc Nơi cư trú</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Nhập xã, phường, địa chỉ cư trú..."
+                    value={filterAddress}
+                    onChange={(e) => setFilterAddress(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Các trường lọc thả xuống khi người dùng mở rộng */}
+            {showAdvanced && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-dashed border-indigo-100 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Kết quả thi</label>
+                  <Select value={filterExamStatus} onValueChange={setFilterExamStatus}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Tất cả" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả kết quả</SelectItem>
+                      <SelectItem value="Pass">Đậu</SelectItem>
+                      <SelectItem value="Fail">Rớt</SelectItem>
+                      <SelectItem value="Not_Tested">Chưa thi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Trạng thái hồ sơ</label>
+                  <Select value={filterHasProfile} onValueChange={setFilterHasProfile}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Tất cả" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                      <SelectItem value="true">Có hồ sơ</SelectItem>
+                      <SelectItem value="false">Không hồ sơ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Đăng ký app & Nộp tiền</label>
+                  <Select value={filterHasFee} onValueChange={setFilterHasFee}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Tất cả" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                      <SelectItem value="true">Đã nộp tiền</SelectItem>
+                      <SelectItem value="false">Chưa nộp tiền</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Trạng thái GPLX</label>
+                  <Select value={filterGplxStatus} onValueChange={setFilterGplxStatus}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Tất cả" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                      <SelectItem value="Returned">Đã về (Đã nhận)</SelectItem>
+                      <SelectItem value="Pending">Chờ GPLX (Chờ nhận)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Giao diện nạp/đối chiếu file bưu điện */}
         <Card className="border-blue-200 bg-blue-50/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2 text-blue-700">
@@ -1024,8 +1220,9 @@ export default function CandidatesPage() {
           </Card>
         )}
 
+        {/* Các thẻ thống kê nhanh theo thời gian thực (Giá trị sẽ thay đổi dựa vào Bộ lọc tìm kiếm) */}
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-          <StatCard label="Tổng HV" value={stats.total} color="from-blue-500 to-cyan-500" />
+          <StatCard label="Tổng HV đã lọc" value={stats.total} color="from-blue-500 to-cyan-500" />
           <StatCard label="Đậu" value={stats.passed} color="from-emerald-500 to-teal-500" />
           <StatCard label="Rớt" value={stats.failed} color="from-red-500 to-orange-500" />
           <StatCard label="Chưa thi" value={stats.notTested} color="from-amber-500 to-yellow-500" />
@@ -1055,7 +1252,7 @@ export default function CandidatesPage() {
             {filteredCandidates.length === 0 ? (
               <div className="text-center py-12">
                 <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">{isLoading ? 'Đang tải dữ liệu...' : 'Không có học viên nào cho ngày này'}</p>
+                <p className="text-muted-foreground">{isLoading ? 'Đang tải dữ liệu...' : 'Không tìm thấy học viên nào phù hợp'}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
