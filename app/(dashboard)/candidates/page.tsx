@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarIcon, Users, FileSpreadsheet, Search, ExternalLink, Upload, CheckCircle2, AlertCircle, Download } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, FileSpreadsheet, Search, ExternalLink, Upload, CheckCircle2, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -44,13 +44,11 @@ interface IncompleteRecord {
   dateOfBirth: string;
   code: string;
   selectedSheet: string;
+  recordKey?: string; // Mã khóa Firebase để định vị khi xóa
 }
 
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag-vDGsZgmH4rX_TicLtVwD-y696bgk/edit?usp=sharing';
 
-/**
- * Hàm phân tích thông tin người nhận theo thuật toán nâng cấp
- */
 function parseRecipient(text: string) {
   const cleaned = text.trim();
   if (!cleaned) return { sbd: '', name: '', dob: '', isValid: false };
@@ -59,14 +57,11 @@ function parseRecipient(text: string) {
   let dob = '';
   let name = '';
 
-  // Phân tách chuỗi thô thành các từ (tokens)
   const tokens = cleaned.split(/\s+/);
 
-  // 1. Phát hiện và xử lý Ngày Sinh (chứa ký tự '/' và có số)
   const dobIndex = tokens.findIndex(t => t.includes('/') && /\d/.test(t));
   if (dobIndex !== -1) {
     const rawDob = tokens[dobIndex];
-    // Loại bỏ các ký tự chữ cái hoặc dấu ngoặc quanh ngày sinh (ví dụ: "12/05/1995(A1)" -> "12/05/1995")
     const cleanDob = rawDob.replace(/[^\d/]/g, '');
     const dateParts = cleanDob.split('/');
     
@@ -75,15 +70,12 @@ function parseRecipient(text: string) {
       let month = dateParts[1].trim();
       let year = dateParts[2].trim();
 
-      // Chuẩn hóa ngày (đảm bảo 2 chữ số)
       if (day.length === 1) day = '0' + day;
       else if (day.length > 2) day = day.slice(-2);
 
-      // Chuẩn hóa tháng (đảm bảo 2 chữ số)
       if (month.length === 1) month = '0' + month;
       else if (month.length > 2) month = month.slice(-2);
 
-      // Chuẩn hóa năm (đảm bảo 4 chữ số)
       if (year.length === 2) {
         const yNum = parseInt(year, 10);
         year = (yNum > 30 ? '19' : '20') + year;
@@ -96,27 +88,23 @@ function parseRecipient(text: string) {
       if (day.length === 2 && month.length === 2 && year.length === 4) {
         dob = `${day}/${month}/${year}`;
       } else {
-        dob = cleanDob; // Giữ lại giá trị sạch nếu không thể chuẩn hóa hoàn chỉnh
+        dob = cleanDob;
       }
     } else {
       dob = cleanDob;
     }
-    // Xóa token ngày sinh khỏi mảng để không ảnh hưởng phân tích các trường khác
     tokens.splice(dobIndex, 1);
   }
 
-  // 2. Phát hiện Số báo danh (SBD) là số tối đa 4 chữ số
   const sbdIndex = tokens.findIndex(t => /^\d{1,4}$/.test(t));
   if (sbdIndex !== -1) {
     sbd = tokens[sbdIndex];
     tokens.splice(sbdIndex, 1);
   }
 
-  // 3. Phát hiện Tên (là chữ, không chứa số)
   const nameParts = tokens.filter(t => !/\d/.test(t) && /[a-zA-Zà-ỹÀ-ỸđĐ]/.test(t));
   name = nameParts.join(' ').trim();
 
-  // Xác minh tính chính xác của cả 3 trường
   const hasSbd = sbd !== '';
   const hasName = name !== '' && name.length >= 2;
   const hasDob = dob !== '' && dob.includes('/');
@@ -136,11 +124,13 @@ export default function CandidatesPage() {
   
   const [isUpdatingCode, setIsUpdatingCode] = useState(false);
   const [updateResult, setUpdateResult] = useState<{ success: boolean; message: string; updatedCount?: number } | null>(null);
-  const [conflicts, setConflicts] = useState<any[]>([]);
-  const [unmatched, setUnmatched] = useState<any[]>([]);
   
-  // Quản lý danh sách bản ghi thiếu thông tin cần xử lý thủ công
+  // Danh sách từ Firebase DB
+  const [conflicts, setConflicts] = useState<any[]>([]);
   const [incompleteRecords, setIncompleteRecords] = useState<IncompleteRecord[]>([]);
+  const [unmatched, setUnmatched] = useState<any[]>([]);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isResolvingIncomplete, setIsResolvingIncomplete] = useState<number | null>(null);
   const [isResolvingConflict, setIsResolvingConflict] = useState<string | null>(null);
 
@@ -159,6 +149,21 @@ export default function CandidatesPage() {
     return new Date(sheetName);
   };
 
+  // Nạp đồng thời cả 3 danh sách từ Firebase Database về máy
+  const loadStoredRecords = async () => {
+    try {
+      const response = await fetch('/api/sheets/update-code');
+      const result = await response.json();
+      if (result.success) {
+        setConflicts(result.conflicts || []);
+        setIncompleteRecords(result.incompleteRecords || []);
+        setUnmatched(result.unmatched || []);
+      }
+    } catch (error) {
+      console.error('Lỗi khi nạp dữ liệu lưu trữ từ DB:', error);
+    }
+  };
+
   useEffect(() => {
     const loadSheets = async () => {
       try {
@@ -172,6 +177,7 @@ export default function CandidatesPage() {
       }
     };
     loadSheets();
+    loadStoredRecords(); // Tải tự động dữ liệu cũ đã lưu từ Firebase
   }, []);
 
   const loadCandidates = async () => {
@@ -213,6 +219,30 @@ export default function CandidatesPage() {
     returnedGPLX: filteredCandidates.filter(c => c.gplx_status === 'Returned').length,
   };
 
+  const handleReEvaluateConflicts = async () => {
+    setIsRefreshing(true);
+    try {
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 're_evaluate' }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        alert(result.message);
+        await loadStoredRecords();
+        await loadCandidates();
+      } else {
+        alert(`Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Không thể thực hiện kết nối làm mới xung đột.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const handleUpdateCode = async (file: File) => {
     setIsUpdatingCode(true);
     setUpdateResult(null);
@@ -244,7 +274,6 @@ export default function CandidatesPage() {
         const parsed = parseRecipient(recipientVal);
         
         if (parsed.isValid) {
-          // Trường hợp phát hiện chính xác cả 3 trường
           excelData.push({
             sbd: parsed.sbd,
             fullName: parsed.name,
@@ -252,7 +281,6 @@ export default function CandidatesPage() {
             code,
           });
         } else {
-          // Trường hợp thiếu ít nhất 1 trường thông tin
           incompleteList.push({
             rawText: recipientVal,
             sbd: parsed.sbd || '',
@@ -264,44 +292,32 @@ export default function CandidatesPage() {
         }
       }
 
-      setIncompleteRecords(incompleteList);
-
       if (excelData.length === 0 && incompleteList.length === 0) {
         setUpdateResult({ success: false, message: 'Không tìm thấy dữ liệu khả dụng từ hàng 3 trở đi trong file Excel' });
         setIsUpdatingCode(false);
         return;
       }
 
-      // Chỉ tiến hành cập nhật tự động qua API nếu có bản ghi hợp lệ chứa đủ 3 trường
-      if (excelData.length > 0) {
-        const response = await fetch('/api/sheets/update-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ excelData }),
-        });
+      // Nâng cấp: Gửi đồng thời cả danh sách thiếu (incompleteList) để lưu vào database
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ excelData, incompleteData: incompleteList }),
+      });
 
-        const result = await response.json();
-        
-        if (result.success) {
-          setUpdateResult({
-            success: true,
-            message: `Xử lý hoàn tất! Đã cập nhật tự động thành công cho ${result.autoUpdatedCount} học viên khớp duy nhất. Hãy kiểm tra các bản ghi thiếu thông tin cần xử lý thủ công bên dưới.`,
-            updatedCount: result.autoUpdatedCount,
-          });
-          
-          setConflicts(result.conflicts || []);
-          setUnmatched(result.unmatched || []);
-          
-          await loadCandidates();
-        } else {
-          setUpdateResult({ success: false, message: result.error || 'Xảy ra lỗi trong lúc phân tích dữ liệu bưu điện' });
-        }
-      } else {
+      const result = await response.json();
+      
+      if (result.success) {
         setUpdateResult({
           success: true,
-          message: `Không có học viên nào đủ cả 3 trường thông tin để đối chiếu tự động. Vui lòng xử lý thủ công các bản ghi bên dưới.`,
-          updatedCount: 0
+          message: `Phân tích hoàn tất! Đã cập nhật ${result.autoUpdatedCount} học viên khớp duy nhất. Toàn bộ các bản ghi xung đột, không khớp, và thiếu thông tin khác đã được lưu trữ vĩnh viễn trên Database.`,
+          updatedCount: result.autoUpdatedCount,
         });
+        
+        await loadStoredRecords(); // Nạp lại cả 3 danh sách mới nhất từ Firebase DB
+        await loadCandidates();
+      } else {
+        setUpdateResult({ success: false, message: result.error || 'Xảy ra lỗi trong lúc phân tích dữ liệu bưu điện' });
       }
     } catch (error: any) {
       console.error('Lỗi tải dữ liệu Excel:', error);
@@ -311,7 +327,7 @@ export default function CandidatesPage() {
     }
   };
 
-  const handleResolveConflict = async (sheetName: string, sbd: string, code: string, conflictIndex: number) => {
+  const handleResolveConflict = async (sheetName: string, sbd: string, code: string, conflictIndex: number, conflictKey: string) => {
     const resolveId = `${conflictIndex}-${sheetName}`;
     setIsResolvingConflict(resolveId);
     try {
@@ -323,6 +339,7 @@ export default function CandidatesPage() {
           sheetName,
           sbd,
           code,
+          conflictKey
         }),
       });
       const result = await response.json();
@@ -341,13 +358,10 @@ export default function CandidatesPage() {
     }
   };
 
-  /**
-   * Cập nhật thủ công cho bản ghi thiếu trường thông tin
-   */
   const handleResolveIncomplete = async (index: number) => {
     const record = incompleteRecords[index];
-    if (!record.sbd.trim()) {
-      alert('Vui lòng điền Số báo danh (SBD) để có thể xác định học viên!');
+    if (!record.sbd.trim() && !record.fullName.trim()) {
+      alert('Vui lòng điền Số báo danh (SBD) hoặc Họ và Tên để có thể xác định học viên!');
       return;
     }
     if (!record.selectedSheet) {
@@ -363,13 +377,15 @@ export default function CandidatesPage() {
         body: JSON.stringify({
           action: 'resolve_conflict',
           sheetName: record.selectedSheet,
-          sbd: record.sbd.trim(),
+          sbd: record.sbd.trim() || undefined,
+          fullName: record.fullName.trim() || undefined,
           code: record.code,
+          recordKey: record.recordKey, // Truyền thêm key để tự động xóa trong incomplete_records của Firebase
         }),
       });
       const result = await response.json();
       if (result.success) {
-        alert('Cập nhật mã hiệu thủ công thành công!');
+        alert(result.message || 'Cập nhật mã hiệu thủ công thành công!');
         setIncompleteRecords(prev => prev.filter((_, idx) => idx !== index));
         await loadCandidates();
       } else {
@@ -380,6 +396,135 @@ export default function CandidatesPage() {
       alert('Không thể lưu mã hiệu bưu điện thủ công');
     } finally {
       setIsResolvingIncomplete(null);
+    }
+  };
+
+  // --- CÁC HÀM XÓA PHÁT SINH MỚI CHO BẢN GHI TRÙNG KHỚP ---
+  const handleDeleteConflict = async (conflictKey: string, index: number) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa bản ghi xung đột này? (Dữ liệu học viên gốc trên Google Sheets vẫn được giữ nguyên)')) return;
+
+    try {
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_conflict', conflictKey }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setConflicts(prev => prev.filter((_, idx) => idx !== index));
+      } else {
+        alert(`Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Lỗi khi thực hiện xóa xung đột.');
+    }
+  };
+
+  const handleDeleteAllConflicts = async () => {
+    if (!confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ danh sách trùng khớp xung đột?')) return;
+
+    try {
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_all_conflicts' }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setConflicts([]);
+      } else {
+        alert(`Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Lỗi khi thực hiện dọn dẹp danh sách xung đột.');
+    }
+  };
+
+  // --- CÁC HÀM XÓA PHÁT SINH MỚI CHO BẢN GHI THIẾU THÔNG TIN ---
+  const handleDeleteIncomplete = async (recordKey: string, index: number) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa bản ghi thiếu thông tin này khỏi danh sách Database?')) return;
+
+    try {
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_incomplete_record', recordKey }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setIncompleteRecords(prev => prev.filter((_, idx) => idx !== index));
+      } else {
+        alert(`Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Lỗi kết nối khi xóa bản ghi.');
+    }
+  };
+
+  const handleDeleteAllIncomplete = async () => {
+    if (!confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ danh sách thiếu thông tin đã lưu trữ?')) return;
+
+    try {
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_all_incomplete_records' }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setIncompleteRecords([]);
+      } else {
+        alert(`Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Lỗi kết nối khi dọn sạch danh sách.');
+    }
+  };
+
+  // --- CÁC HÀM XÓA PHÁT SINH MỚI CHO BẢN GHI KHÔNG TỒN TẠI (UNMATCHED) ---
+  const handleDeleteUnmatched = async (unmatchedKey: string, index: number) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa bản ghi không tồn tại này khỏi danh sách Database?')) return;
+
+    try {
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_unmatched_record', unmatchedKey }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setUnmatched(prev => prev.filter((_, idx) => idx !== index));
+      } else {
+        alert(`Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Lỗi kết nối khi xóa bản ghi.');
+    }
+  };
+
+  const handleDeleteAllUnmatched = async () => {
+    if (!confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ danh sách học viên không tồn tại trong hệ thống?')) return;
+
+    try {
+      const response = await fetch('/api/sheets/update-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_all_unmatched_records' }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setUnmatched([]);
+      } else {
+        alert(`Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Lỗi kết nối khi dọn sạch danh sách.');
     }
   };
 
@@ -531,13 +676,13 @@ export default function CandidatesPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="text-xs text-muted-foreground space-y-1">
-              <p>📍 <strong>Tiêu chí nhận diện tự động (Yêu cầu nhận dạng đủ 3 trường):</strong></p>
+              <p>📍 <strong>Tiêu chí nhận diện tự động:</strong></p>
               <ul className="list-disc list-inside pl-2">
-                <li><strong>SBD:</strong> Là dạng số, độ dài tối đa 4 ký tự.</li>
-                <li><strong>Họ Tên:</strong> Là dạng chữ cái không chứa số.</li>
-                <li><strong>Ngày Sinh:</strong> Nhận diện khi phần tử chứa ký tự gạch chéo <code>/</code> và tự động chuẩn hóa về dạng <code>dd/MM/yyyy</code>.</li>
+                <li><strong>SBD:</strong> Dạng số, tối đa 4 ký tự.</li>
+                <li><strong>Họ Tên:</strong> Dạng chữ cái không chứa số.</li>
+                <li><strong>Ngày Sinh:</strong> Chứa ký tự <code>/</code>, tự động chuẩn hóa thành <code>dd/MM/yyyy</code>.</li>
               </ul>
-              <p className="mt-1">Dữ liệu thô đọc từ <strong>Hàng 3, cột E (Tên người nhận)</strong> và mã hiệu ở <strong>cột M (Số hiệu BG)</strong>.</p>
+              <p className="mt-1">Dữ liệu bốc tách từ <strong>Hàng 3, cột E (Người nhận)</strong> và mã vận đơn ở <strong>cột M (Số hiệu BG)</strong>.</p>
             </div>
             <div className="flex gap-2">
               <input
@@ -569,13 +714,24 @@ export default function CandidatesPage() {
         {/* Danh sách các bản ghi thiếu thông tin (< 3 trường) cần xử lý thủ công */}
         {incompleteRecords.length > 0 && (
           <Card className="border-amber-200 bg-amber-50/50">
-            <CardHeader>
-              <CardTitle className="text-amber-800 text-base font-bold flex items-center gap-2">
-                ⚠️ Bản ghi thiếu thông tin - Cần xử lý thủ công ({incompleteRecords.length})
-              </CardTitle>
-              <p className="text-xs text-amber-700">
-                Các bản ghi dưới đây không chứa đủ 3 trường dữ liệu (SBD tối đa 4 số, Tên chữ, Ngày sinh có ký tự /) để đối chiếu tự động. Bạn vui lòng bổ sung thông tin chính xác, chọn ngày thi hợp lệ và bấm lưu:
-              </p>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-amber-800 text-base font-bold flex items-center gap-2">
+                  ⚠️ Bản ghi thiếu thông tin - Cần xử lý thủ công ({incompleteRecords.length})
+                </CardTitle>
+                <p className="text-xs text-amber-700">
+                  Các bản ghi dưới đây không chứa đủ 3 trường dữ liệu tiêu chuẩn. Bạn vui lòng bổ sung thông tin chính xác, chọn ngày thi hợp lệ và bấm lưu:
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteAllIncomplete}
+                className="font-bold flex items-center gap-1.5"
+              >
+                <Trash2 className="h-4 w-4" />
+                Xóa tất cả
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
@@ -589,6 +745,7 @@ export default function CandidatesPage() {
                       <th className="py-2 px-3">Mã Hiệu (Cột M)</th>
                       <th className="py-2 px-3">Ngày thi</th>
                       <th className="py-2 px-3 text-center">Thao tác</th>
+                      <th className="py-2 px-3 text-center">Xóa</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -665,6 +822,17 @@ export default function CandidatesPage() {
                             {isResolvingIncomplete === idx ? '⏳' : 'Lưu'}
                           </Button>
                         </td>
+                        <td className="py-2 px-3 text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100/50"
+                            onClick={() => handleDeleteIncomplete(record.recordKey || '', idx)}
+                            title="Xóa bản ghi thiếu thông tin"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -674,15 +842,48 @@ export default function CandidatesPage() {
           </Card>
         )}
 
+        {/* Danh sách xung đột trùng khớp nhiều ngày thi */}
         {conflicts.length > 0 && (
           <Card className="border-amber-200 bg-amber-50/50">
-            <CardHeader>
-              <CardTitle className="text-amber-800 text-base font-bold flex items-center gap-2">
-                ⚠️ Phát hiện trùng khớp thông tin trên nhiều ngày thi ({conflicts.length})
-              </CardTitle>
-              <p className="text-xs text-amber-700">
-                Nhấn chọn chính xác ngày thi thích hợp dưới đây để ghi đè mã hiệu bưu điện tương ứng:
-              </p>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-amber-800 text-base font-bold flex items-center gap-2">
+                  ⚠️ Phát hiện trùng khớp thông tin trên nhiều ngày thi ({conflicts.length})
+                </CardTitle>
+                <p className="text-xs text-amber-700">
+                  Hệ thống lưu trữ các xung đột này. Bạn hãy bấm chọn ngày thi chính xác để lưu hoặc chạy lại đối chiếu:
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReEvaluateConflicts}
+                  disabled={isRefreshing}
+                  className="bg-white border-amber-300 hover:bg-amber-100 text-amber-800 font-bold"
+                >
+                  {isRefreshing ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
+                      Đang quét...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-1.5" />
+                      Làm mới & Chạy lại
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteAllConflicts}
+                  className="font-bold flex items-center gap-1.5"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Xóa tất cả
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
@@ -694,6 +895,7 @@ export default function CandidatesPage() {
                       <th className="py-2 px-3">Ngày Sinh</th>
                       <th className="py-2 px-3">Mã Hiệu (Cột M)</th>
                       <th className="py-2 px-3 text-center">Ghi nhận vào ngày thi</th>
+                      <th className="py-2 px-3 text-center">Xóa</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -712,13 +914,24 @@ export default function CandidatesPage() {
                                 size="sm"
                                 variant="outline"
                                 className="bg-white border-amber-300 hover:bg-amber-200 hover:text-amber-900 font-semibold"
-                                onClick={() => handleResolveConflict(match.sheetName, match.sbd, conflict.excelRow.code, idx)}
+                                onClick={() => handleResolveConflict(match.sheetName, match.sbd, conflict.excelRow.code, idx, conflict.conflictKey)}
                                 disabled={isResolvingConflict === resolveId}
                               >
                                 {isResolvingConflict === resolveId ? '⏳...' : `📅 ${match.sheetName}`}
                               </Button>
                             );
                           })}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100/50"
+                            onClick={() => handleDeleteConflict(conflict.conflictKey, idx)}
+                            title="Xóa xung đột này"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -731,13 +944,24 @@ export default function CandidatesPage() {
 
         {unmatched.length > 0 && (
           <Card className="border-red-200 bg-red-50/50">
-            <CardHeader>
-              <CardTitle className="text-red-800 text-base font-bold flex items-center gap-2">
-                ❌ Thí sinh tải lên không tìm thấy trong cơ sở dữ liệu ({unmatched.length})
-              </CardTitle>
-              <p className="text-xs text-red-700">
-                Các thí sinh này không khớp bất kỳ thông tin nào trong toàn bộ lịch sử các ngày thi:
-              </p>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-red-800 text-base font-bold flex items-center gap-2">
+                  ❌ Thí sinh tải lên không tìm thấy trong cơ sở dữ liệu ({unmatched.length})
+                </CardTitle>
+                <p className="text-xs text-red-700">
+                  Các thí sinh này không khớp bất kỳ thông tin nào trong toàn bộ lịch sử các ngày thi:
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteAllUnmatched}
+                className="font-bold flex items-center gap-1.5"
+              >
+                <Trash2 className="h-4 w-4" />
+                Xóa tất cả
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
@@ -748,6 +972,7 @@ export default function CandidatesPage() {
                       <th className="py-2 px-3">Họ Tên</th>
                       <th className="py-2 px-3">Ngày Sinh</th>
                       <th className="py-2 px-3">Mã Hiệu (Cột M)</th>
+                      <th className="py-2 px-3 text-center">Xóa</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -757,6 +982,17 @@ export default function CandidatesPage() {
                         <td className="py-2 px-3 font-medium">{row.fullName}</td>
                         <td className="py-2 px-3">{row.dateOfBirth || '-'}</td>
                         <td className="py-2 px-3 font-mono">{row.code || '-'}</td>
+                        <td className="py-2 px-3 text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100/50"
+                            onClick={() => handleDeleteUnmatched(row.unmatchedKey || '', idx)}
+                            title="Xóa bản ghi không tồn tại"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

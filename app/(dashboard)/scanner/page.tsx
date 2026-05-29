@@ -1,3 +1,4 @@
+// plx_online/app/(dashboard)/scanner/page.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -9,14 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { 
-  QrCode, 
-  Search, 
-  Calendar, 
-  Users, 
-  Trash2, 
-  AlertTriangle, 
-  CheckCircle, 
+import {
+  QrCode,
+  Search,
+  Calendar,
+  Users,
+  Trash2,
+  AlertTriangle,
+  CheckCircle,
   XCircle,
   FileSpreadsheet,
   ExternalLink,
@@ -36,16 +37,13 @@ interface ScannedCandidate extends Candidate {
 
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1LhWQJVepItW3Ag-vDGsZgmH4rX_TicLtVwD-y696bgk/edit?usp=sharing';
 
-// Hàm kích hoạt phản hồi thành công (rung + âm thanh bíp)
 const triggerSuccessFeedback = () => {
   if (typeof window === 'undefined') return;
 
-  // 1. KÍCH HOẠT RUNG (Chạy tốt trên Android)
   if ('vibrate' in navigator) {
-    navigator.vibrate(200); // Rung ngắn trong 200ms
+    navigator.vibrate(200);
   }
 
-  // 2. PHÁT TIẾNG BÍP (Chạy tốt trên cả iOS và Android)
   try {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (AudioContextClass) {
@@ -56,15 +54,11 @@ const triggerSuccessFeedback = () => {
       oscillator.connect(gainNode);
       gainNode.connect(audioCtx.destination);
 
-      // Cấu hình âm thanh
-      oscillator.type = 'sine';          // Loại sóng âm (sine tạo tiếng bíp mượt)
-      oscillator.frequency.value = 1200; // Tần số âm thanh (1200Hz nghe rất thanh và rõ)
-      gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime); // Âm lượng nhỏ vừa phải (8%)
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 1200;
+      gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
 
-      // Bắt đầu phát
       oscillator.start();
-      
-      // Tắt tiếng bíp sau 0.1 giây (100ms) để âm thanh gọn gàng
       oscillator.stop(audioCtx.currentTime + 0.1);
     }
   } catch (error) {
@@ -87,14 +81,20 @@ export default function ScannerPage() {
   const qrInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // --- CÁC REF ĐỂ KHẮC PHỤC LỖI TRÙNG LẶP & ĐỒNG BỘ CAMERA ---
+  // States cho Hộp thoại Rút bưu gửi
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
+  const [withdrawCandidate, setWithdrawCandidate] = useState<ScannedCandidate | null>(null);
+  const [wHasProfile, setWHasProfile] = useState(false);
+  const [wExamStatus, setWExamStatus] = useState<'Pass' | 'Fail' | 'Not_Tested'>('Pass');
+  const [wHasAppAndFee, setWHasAppAndFee] = useState(false);
+  const [wGplxStatus, setWGplxStatus] = useState<'Returned' | 'Pending'>('Pending');
+
   const scannedCandidatesRef = useRef(scannedCandidates);
   const selectedDateRef = useRef(selectedDate);
   const lastScannedCodeRef = useRef<string | null>(null);
   const lastScannedTimeRef = useRef<number>(0);
   const isProcessingRef = useRef<boolean>(false);
 
-  // Đồng bộ state thực tế sang ref để camera (bị stale closure) đọc được dữ liệu mới nhất
   useEffect(() => {
     scannedCandidatesRef.current = scannedCandidates;
   }, [scannedCandidates]);
@@ -103,7 +103,6 @@ export default function ScannerPage() {
     selectedDateRef.current = selectedDate;
   }, [selectedDate]);
 
-  // Giải phóng khóa khi người dùng tắt modal camera
   useEffect(() => {
     if (!showCameraScanner) {
       lastScannedCodeRef.current = null;
@@ -112,7 +111,6 @@ export default function ScannerPage() {
     }
   }, [showCameraScanner]);
 
-  // Load danh sách sheets khi mount
   useEffect(() => {
     const loadSheets = async () => {
       try {
@@ -128,12 +126,10 @@ export default function ScannerPage() {
     loadSheets();
   }, []);
 
-  // Tự động focus vào ô QR khi load trang
   useEffect(() => {
     qrInputRef.current?.focus();
   }, []);
 
-  // Đóng camera scanner khi click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -149,18 +145,14 @@ export default function ScannerPage() {
     }
   }, [showCameraScanner]);
 
-  // Khởi tạo QR code scanner khi modal mở
   useEffect(() => {
     if (showCameraScanner && typeof window !== 'undefined') {
       const initScanner = async () => {
         try {
           const { Html5Qrcode } = await import('html5-qrcode');
-          
           const html5QrCode = new Html5Qrcode('qr-reader');
-          
           const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-          
-          // Đăng ký camera
+
           html5QrCode.start(
             { facingMode: 'environment' },
             config,
@@ -173,16 +165,16 @@ export default function ScannerPage() {
           ).catch((err) => {
             console.error('Unable to start scanning', err);
           });
-          
+
           (window as any).qrCodeScanner = html5QrCode;
         } catch (error) {
           console.error('Failed to load QR scanner:', error);
         }
       };
-      
+
       initScanner();
     }
-    
+
     return () => {
       if ((window as any).qrCodeScanner) {
         (window as any).qrCodeScanner.stop().catch(console.error);
@@ -191,71 +183,58 @@ export default function ScannerPage() {
     };
   }, [showCameraScanner]);
 
-  // Xử lý kết quả từ camera scanner
   const handleCameraScanResult = (code: string) => {
     if (!code.trim()) return;
-    
+
     const extractedCode = code.trim();
     const now = Date.now();
-    
-    // 1. LỚP 1: Chống quét trùng lặp tức thời cùng 1 mã trong vòng 3 giây
+
     if (lastScannedCodeRef.current === extractedCode && now - lastScannedTimeRef.current < 3000) {
       return;
     }
-    
-    // 2. LỚP 2: Chống gửi chồng chéo nhiều request API khi một lượt quét trước đang chạy
+
     if (isProcessingRef.current) {
       return;
     }
-    
-    // Ghi nhận lịch sử quét để kích hoạt cooldown
+
     lastScannedCodeRef.current = extractedCode;
     lastScannedTimeRef.current = now;
-    
-    // 3. LỚP 3: Sử dụng Ref để so sánh trùng lặp với danh sách thực tế (khắc phục stale closure)
+
     const isDuplicate = scannedCandidatesRef.current.some(c => c.sbd === extractedCode);
-    
+
     if (isDuplicate) {
       console.log('Mã hiệu đã có trong danh sách đã quét (trùng lặp):', extractedCode);
       return;
     }
-    
-    // Tiến hành gọi API tìm kiếm
+
     performQRScan(extractedCode, true);
   };
 
-  // Hàm thực hiện quét QR chung cho cả manual và camera
   const performQRScan = async (code: string, fromCamera: boolean = false) => {
     if (!code.trim()) return;
-    
+
     setIsSearching(true);
     if (fromCamera) {
-      isProcessingRef.current = true; // Khóa tiến trình
+      isProcessingRef.current = true;
     }
 
     try {
-      // Sử dụng selectedDate từ Ref để tránh dữ liệu cũ của ngày thi
       const currentDate = selectedDateRef.current;
       const response = await fetch(`/api/scanner/search?code=${encodeURIComponent(code)}&date=${currentDate}`, {
         method: 'GET',
       });
       const result = await response.json();
-      
-      if (result.success && result.candidates && result.candidates.length > 0) {
-        // Lấy danh sách đã quét hiện tại từ Ref
-        const currentScanned = scannedCandidatesRef.current;
 
-        // Kiểm tra xem có thí sinh mới không trùng với danh sách đã quét không
+      if (result.success && result.candidates && result.candidates.length > 0) {
+        const currentScanned = scannedCandidatesRef.current;
         const hasNewCandidates = result.candidates.some(
           (c: Candidate) => !currentScanned.some(p => p.sbd === c.sbd && p.exam_date === c.exam_date)
         );
-        
-        // Chỉ kích hoạt phản hồi (rung + âm thanh) nếu có thí sinh mới thực sự
+
         if (hasNewCandidates) {
           triggerSuccessFeedback();
         }
-        
-        // Thêm từng thí sinh vào danh sách đã quét (tránh trùng)
+
         setScannedCandidates(prev => {
           const newCandidates = result.candidates.filter(
             (c: Candidate) => !prev.some(p => p.sbd === c.sbd && p.exam_date === c.exam_date)
@@ -282,38 +261,35 @@ export default function ScannerPage() {
     } finally {
       setIsSearching(false);
       if (fromCamera) {
-        isProcessingRef.current = false; // Mở khóa tiến trình khi kết thúc tác vụ bất đồng bộ
+        isProcessingRef.current = false;
       }
     }
-    
-    // Chỉ dọn dẹp input khi nhập thủ công
+
     if (!fromCamera) {
       setUnifiedInput('');
       qrInputRef.current?.focus();
     }
   };
 
-  // Tìm kiếm theo tên hoặc SBD khi nhập thủ công
   const handleSearch = async () => {
     if (!unifiedInput.trim()) return;
-    
+
     setIsSearching(true);
     try {
       const response = await fetch(`/api/scanner/search?query=${encodeURIComponent(unifiedInput)}&date=${selectedDate}&type=name_sbd`, {
         method: 'GET',
       });
       const result = await response.json();
-      
+
       if (result.success && result.candidates && result.candidates.length > 0) {
-        // Kiểm tra xem có thí sinh mới không trùng với danh sách đã quét không
         const hasNewCandidates = result.candidates.some(
           (c: Candidate) => !scannedCandidates.some(p => p.sbd === c.sbd && p.exam_date === c.exam_date)
         );
-        
+
         if (hasNewCandidates) {
           triggerSuccessFeedback();
         }
-        
+
         setScannedCandidates(prev => {
           const newCandidates = result.candidates.filter(
             (c: Candidate) => !prev.some(p => p.sbd === c.sbd && p.exam_date === c.exam_date)
@@ -338,34 +314,30 @@ export default function ScannerPage() {
     }
   };
 
-  // Xóa một thí sinh khỏi danh sách
   const removeCandidate = (candidate: ScannedCandidate) => {
     setScannedCandidates(prev => prev.filter(c => c.sbd !== candidate.sbd || c.exam_date !== candidate.exam_date));
   };
 
-  // Xóa toàn bộ danh sách
   const clearAll = () => {
     setScannedCandidates([]);
   };
 
-  // Mở dialog xóa
   const openDeleteDialog = (type: 'single' | 'profile' | 'gplx', candidate?: ScannedCandidate) => {
     setDeleteType(type);
     setCandidateToDelete(candidate || null);
     setShowDeleteDialog(true);
   };
 
-  // Xử lý xóa sau khi xác nhận
   const handleDeleteConfirm = async () => {
     setShowDeleteDialog(false);
-    
+
     if (deleteType === 'single' && candidateToDelete) {
       removeCandidate(candidateToDelete);
       return;
     }
 
     let candidatesToDelete: ScannedCandidate[] = [];
-    
+
     if (deleteType === 'profile') {
       candidatesToDelete = scannedCandidates.filter(c => c.has_profile);
     } else if (deleteType === 'gplx') {
@@ -391,9 +363,9 @@ export default function ScannerPage() {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
-        setScannedCandidates(prev => 
+        setScannedCandidates(prev =>
           prev.filter(c => !candidatesToDelete.some(d => d.sbd === c.sbd && d.exam_date === c.exam_date))
         );
         alert(`Đã xóa thành công ${result.updatedCount} thí sinh`);
@@ -404,11 +376,56 @@ export default function ScannerPage() {
       console.error('Error deleting:', error);
       alert('Có lỗi xảy ra khi xóa');
     }
-    
+
     setCandidateToDelete(null);
   };
 
-  // Thống kê
+  // Mở hộp thoại cấu hình rút bưu gửi
+  const handleOpenWithdraw = (candidate: ScannedCandidate) => {
+    setWithdrawCandidate(candidate);
+    setWHasProfile(candidate.has_profile);
+    setWExamStatus(candidate.exam_status);
+    setWHasAppAndFee(candidate.has_app_and_fee);
+    setWGplxStatus('Pending'); // Mặc định là Chờ (chưa có gplx) khi rút bưu gửi
+    setShowWithdrawDialog(true);
+  };
+
+  // Xác nhận rút bưu gửi trực tiếp
+  const handleWithdrawConfirm = async () => {
+    if (!withdrawCandidate) return;
+
+    setIsSearching(true);
+    try {
+      const response = await fetch('/api/sheets/withdraw-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examDate: withdrawCandidate.exam_date,
+          sbd: withdrawCandidate.sbd,
+          trackingNumber: withdrawCandidate.tracking_number,
+          hasProfile: wHasProfile,
+          examStatus: wExamStatus,
+          hasAppAndFee: wHasAppAndFee,
+          gplxStatus: wGplxStatus
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        alert(result.message);
+        removeCandidate(withdrawCandidate);
+        setShowWithdrawDialog(false);
+        setWithdrawCandidate(null);
+      } else {
+        alert(`Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Không thể thực hiện rút bưu gửi.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const stats = {
     total: scannedCandidates.length,
     hasProfile: scannedCandidates.filter(c => c.has_profile).length,
@@ -424,13 +441,11 @@ export default function ScannerPage() {
       />
 
       <div className="p-4 lg:p-8 space-y-6">
-        {/* Controls */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
         >
-          {/* Chọn ngày thi */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -455,7 +470,6 @@ export default function ScannerPage() {
             </CardContent>
           </Card>
 
-          {/* Tìm kiếm thống nhất */}
           <Card className="md:col-span-2">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -502,14 +516,14 @@ export default function ScannerPage() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button 
+                  <Button
                     onClick={() => {
                       if (searchMode === 'qr') {
                         performQRScan(unifiedInput, false);
                       } else {
                         handleSearch();
                       }
-                    }} 
+                    }}
                     disabled={isSearching || !unifiedInput.trim()}
                     size="icon"
                     className="shrink-0"
@@ -528,15 +542,14 @@ export default function ScannerPage() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {searchMode === 'qr' 
-                  ? 'Nhấn Enter sau khi quét QR hoặc nhập mã hiệu' 
+                {searchMode === 'qr'
+                  ? 'Nhấn Enter sau khi quét QR hoặc nhập mã hiệu'
                   : 'Nhấn Enter để tìm kiếm theo tên hoặc SBD'}
               </p>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Google Sheets Link */}
         <Card>
           <CardContent className="pt-4">
             <a
@@ -552,7 +565,6 @@ export default function ScannerPage() {
           </CardContent>
         </Card>
 
-        {/* Thống kê nhanh */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -565,7 +577,6 @@ export default function ScannerPage() {
           <StatCard label="Đã nhận GPLX" value={stats.returnedGPLX} color="from-indigo-500 to-violet-500" />
         </motion.div>
 
-        {/* Danh sách đã quét */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -626,10 +637,10 @@ export default function ScannerPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">SBD</th>
-                          <th className="text-left py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">Họ tên</th>
-                          <th className="text-left py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap hidden sm:table-cell">Ngày thi</th>
+                        <tr className="border-b text-left">
+                          <th className="py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">SBD</th>
+                          <th className="py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">Họ tên</th>
+                          <th className="py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap hidden sm:table-cell">Ngày thi</th>
                           <th className="text-center py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">Hồ sơ</th>
                           <th className="text-center py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap">Kết quả</th>
                           <th className="text-center py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm whitespace-nowrap hidden md:table-cell">GPLX</th>
@@ -640,25 +651,37 @@ export default function ScannerPage() {
                         {scannedCandidates.map((candidate) => (
                           <tr key={`${candidate.sbd}-${candidate.exam_date}`} className="border-b hover:bg-muted/50">
                             <td className="py-3 px-2 sm:px-4 font-mono text-xs sm:text-sm">{candidate.sbd}</td>
-                            <td className="py-3 px-2 sm:px-4 font-medium text-xs sm:text-sm max-w-[120px] sm:max-w-none truncate">{candidate.name}</td>
+                            <td className="py-3 px-2 sm:px-4 font-medium text-xs sm:text-sm">{candidate.name}</td>
                             <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm hidden sm:table-cell">{candidate.exam_date}</td>
                             <td className="text-center py-3 px-2 sm:px-4">
-                              <Badge variant={candidate.has_profile ? 'default' : 'secondary'} className="text-xs">
-                                {candidate.has_profile ? '✓' : '✗'}
+                              <Badge variant={candidate.has_profile ? 'default' : 'secondary'}>
+                                {candidate.has_profile ? 'Có' : 'Không'}
                               </Badge>
                             </td>
                             <td className="text-center py-3 px-2 sm:px-4">
                               <StatusBadge status={candidate.exam_status} />
                             </td>
                             <td className="text-center py-3 px-2 sm:px-4 hidden md:table-cell">
-                              <Badge variant={candidate.gplx_status === 'Returned' ? 'default' : 'secondary'} className="text-xs">
+                              <Badge variant={candidate.gplx_status === 'Returned' ? 'default' : 'secondary'}>
                                 {candidate.gplx_status === 'Returned' ? 'Đã về' : 'Chờ'}
                               </Badge>
                             </td>
-                            <td className="text-center py-3 px-2 sm:px-4">
+                            <td className="text-center py-3 px-2 sm:px-4 flex justify-center gap-1.5">
+                              {candidate.tracking_number && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold"
+                                  onClick={() => handleOpenWithdraw(candidate)}
+                                  title="Rút bưu gửi & Điều chỉnh trạng thái"
+                                >
+                                  Rút bưu
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                className="h-7 w-7"
                                 onClick={() => openDeleteDialog('single', candidate)}
                               >
                                 <Trash2 className="h-4 w-4 text-red-500" />
@@ -676,30 +699,117 @@ export default function ScannerPage() {
         </motion.div>
       </div>
 
+      {/* Withdraw State Dialog (Cấu hình khi rút bưu) */}
+      {showWithdrawDialog && withdrawCandidate && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-in fade-in" onClick={() => setShowWithdrawDialog(false)}>
+          <div className="bg-background rounded-lg w-full max-w-md p-6 border shadow-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-lg text-amber-700 flex items-center gap-2 mb-2">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              Rút bưu gửi & Điều chỉnh trạng thái
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Bạn đang tiến hành rút bưu gửi có mã vận đơn <code className="bg-muted px-1 rounded font-mono font-bold text-amber-800">{withdrawCandidate.tracking_number}</code> của học viên <strong>{withdrawCandidate.name}</strong> (SBD: {withdrawCandidate.sbd}). Vui lòng điều chỉnh các thông tin cập nhật lên bảng tính:
+            </p>
+
+            <div className="space-y-4">
+              {/* 1. Hồ sơ */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Trạng thái hồ sơ</label>
+                <Select value={wHasProfile ? 'true' : 'false'} onValueChange={(val) => setWHasProfile(val === 'true')}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Có hồ sơ</SelectItem>
+                    <SelectItem value="false">Không có hồ sơ (Chưa hồ sơ)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 2. GPLX */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Trạng thái GPLX</label>
+                <Select value={wGplxStatus} onValueChange={(val: any) => setWGplxStatus(val)}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pending">Chờ GPLX (Chưa có GPLX)</SelectItem>
+                    <SelectItem value="Returned">Đã về (Có GPLX)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 3. Kết quả thi */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Kết quả thi (Giữ nguyên hoặc chỉnh)</label>
+                <Select value={wExamStatus} onValueChange={(val: any) => setWExamStatus(val)}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pass">Đậu</SelectItem>
+                    <SelectItem value="Fail">Rớt</SelectItem>
+                    <SelectItem value="Not_Tested">Chưa thi</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 4. Đăng ký app & Nộp tiền */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Đăng ký app / Đóng phí (Giữ nguyên hoặc chỉnh)</label>
+                <Select value={wHasAppAndFee ? 'true' : 'false'} onValueChange={(val) => setWHasAppAndFee(val === 'true')}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Đã nộp tiền</SelectItem>
+                    <SelectItem value="false">Chưa nộp tiền</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="outline" onClick={() => setShowWithdrawDialog(false)}>
+                Hủy
+              </Button>
+              <Button
+                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold"
+                onClick={handleWithdrawConfirm}
+                disabled={isSearching}
+              >
+                {isSearching ? 'Đang thực hiện...' : 'Xác nhận Rút bưu'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="h-5 w-5" />
-              Xác nhận xóa
+              Xác nhận xóa khỏi danh sách đã quét
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deleteType === 'single' ? (
                 <>
                   Bạn có chắc chắn muốn xóa thí sinh{' '}
-                  <strong>{candidateToDelete?.name}</strong> (SBD: {candidateToDelete?.sbd}) 
-                  khỏi danh sách đã quét?
+                  <strong>{candidateToDelete?.name}</strong> (SBD: {candidateToDelete?.sbd})
+                  khỏi danh sách hiển thị đã quét tạm thời?
                 </>
               ) : deleteType === 'profile' ? (
                 <>
-                  Bạn có chắc chắn muốn xóa <strong>{stats.hasProfile}</strong> thí sinh có hồ sơ 
-                  khỏi danh sách đã quét? Thao tác này sẽ xóa trạng thái "Có hồ sơ" của các thí sinh này.
+                  Bạn có chắc chắn muốn xóa <strong>{stats.hasProfile}</strong> thí sinh có hồ sơ
+                  khỏi danh sách? Thao tác này sẽ cập nhật lại trạng thái "Không có hồ sơ" của họ trên Google Sheets.
                 </>
               ) : (
                 <>
-                  Bạn có chắc chắn muốn xóa <strong>{stats.returnedGPLX}</strong> thí sinh đã nhận GPLX 
-                  khỏi danh sách đã quét? Thao tác này sẽ xóa trạng thái "Đã về" của các thí sinh này.
+                  Bạn có chắc chắn muốn xóa <strong>{stats.returnedGPLX}</strong> thí sinh đã nhận GPLX
+                  khỏi danh sách? Thao tác này sẽ cập nhật lại trạng thái "Chờ" của họ trên Google Sheets.
                 </>
               )}
             </AlertDialogDescription>
@@ -708,7 +818,7 @@ export default function ScannerPage() {
             <AlertDialogCancel>Hủy</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-700">
               <Trash2 className="h-4 w-4 mr-1" />
-              Xóa
+              Xác nhận xóa
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -748,7 +858,7 @@ export default function ScannerPage() {
                     }
                   }}
                 />
-                <Button 
+                <Button
                   onClick={() => performQRScan(unifiedInput, false)}
                   disabled={!unifiedInput.trim()}
                 >
@@ -778,7 +888,7 @@ function StatusBadge({ status }: { status: 'Pass' | 'Fail' | 'Not_Tested' }) {
     Fail: { color: 'bg-red-500', label: 'Rớt' },
     Not_Tested: { color: 'bg-gray-500', label: 'Chưa thi' },
   };
-  
+
   return (
     <Badge className={`${config[status].color} text-white text-xs`}>
       {config[status].label}
