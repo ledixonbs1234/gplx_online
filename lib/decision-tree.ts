@@ -12,11 +12,13 @@ export function analyzeDecisionTree(candidates: Candidate[]): DayReport {
       total: 0,
       returned: 0,
       pending: 0,
+      returned_with_postal: 0, // Khởi tạo giá trị ban đầu
     },
     without_fee: {
       total: 0,
       returned: 0,
       pending: 0,
+      returned_with_postal: 0, // Khởi tạo giá trị ban đầu
     },
   };
 
@@ -38,6 +40,10 @@ export function analyzeDecisionTree(candidates: Candidate[]): DayReport {
         report.with_app_and_fee.total++;
         if (candidate.gplx_status === 'Returned') {
           report.with_app_and_fee.returned++;
+          // Nếu có mã vận đơn, tính vào danh sách nhận qua bưu gửi
+          if (candidate.tracking_number) {
+            report.with_app_and_fee.returned_with_postal++;
+          }
         } else if (candidate.gplx_status === 'Pending') {
           report.with_app_and_fee.pending++;
         }
@@ -45,6 +51,10 @@ export function analyzeDecisionTree(candidates: Candidate[]): DayReport {
         report.without_fee.total++;
         if (candidate.gplx_status === 'Returned') {
           report.without_fee.returned++;
+          // Nếu có mã vận đơn, tính vào danh sách nhận qua bưu gửi
+          if (candidate.tracking_number) {
+            report.without_fee.returned_with_postal++;
+          }
         } else if (candidate.gplx_status === 'Pending') {
           report.without_fee.pending++;
         }
@@ -53,27 +63,4 @@ export function analyzeDecisionTree(candidates: Candidate[]): DayReport {
   });
 
   return report;
-}
-
-export function generateReportSummary(report: DayReport): string {
-  return `
-📊 BÁO CÁO NGÀY THI: ${report.date}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 Tổng số học viên: ${report.total_candidates} người
-
-❌ KHÔNG CÓ HỒ SƠ: ${report.no_profile_count} người
-   → Rớt: ${report.fail_count} người
-
-✅ THI ĐẬU: ${report.pass_count} người
-
-   💰 ĐÃ NỘP TIỀN: ${report.with_app_and_fee.total} người
-      • GPLX đã về: ${report.with_app_and_fee.returned}
-      • GPLX chưa về: ${report.with_app_and_fee.pending}
-
-   💸 CHƯA NỘP TIỀN: ${report.without_fee.total} người
-      • GPLX đã về: ${report.without_fee.returned}
-      • GPLX chưa về: ${report.without_fee.pending}
-
-📌 TỔNG CHƯA CÓ GPLX: ${report.with_app_and_fee.pending + report.without_fee.pending} người
-  `;
 }

@@ -25,12 +25,14 @@ export interface DayReport {
   pass_count: number;
   with_app_and_fee: {
     total: number;
-    returned: number; // Chỉ còn ghi nhận GPLX đã về
+    returned: number;
     pending: number;
+    returned_with_postal: number; // Thêm dòng này
   };
   without_fee: {
     total: number;
     returned: number;
     pending: number;
+    returned_with_postal: number; // Thêm dòng này
   };
 }
