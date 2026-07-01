@@ -1,104 +1,44 @@
 [
-            {
-              "Name": "phường tam quan",
-              "N": "tam quan",
-              "KD": "tam quan",
-              "Init": "tq"
-            },
-            {
-              "Name": "phường bồng sơn",
-              "N": "bồng sơn",
-              "KD": "bong son",
-              "Init": "bs"
-            },
-            {
-              "Name": "xã hoài sơn",
-              "N": "hoài sơn",
-              "KD": "hoai son",
-              "Init": "hs"
-            },
-            {
-              "Name": "xã hoài châu bắc",
-              "N": "hoài châu bắc",
-              "KD": "hoai chau bac",
-              "Init": "hcb"
-            },
-            {
-              "Name": "xã hoài châu",
-              "N": "hoài châu",
-              "KD": "hoai chau",
-              "Init": "hc"
-            },
-            {
-              "Name": "xã hoài phú",
-              "N": "hoài phú",
-              "KD": "hoai phu",
-              "Init": "hp"
-            },
-            {
-              "Name": "phường tam quan bắc",
-              "N": "tam quan bắc",
-              "KD": "tam quan bac",
-              "Init": "tqb"
-            },
-            {
-              "Name": "phường tam quan nam",
-              "N": "tam quan nam",
-              "KD": "tam quan nam",
-              "Init": "tqn"
-            },
-            {
-              "Name": "phường hoài hảo",
-              "N": "hoài hảo",
-              "KD": "hoai hao",
-              "Init": "hh"
-            },
-            {
-              "Name": "phường hoài thanh tây",
-              "N": "hoài thanh tây",
-              "KD": "hoai thanh tay",
-              "Init": "htt"
-            },
-            {
-              "Name": "phường hoài thanh",
-              "N": "hoài thanh",
-              "KD": "hoai thanh",
-              "Init": "ht"
-            },
-            {
-              "Name": "phường hoài hương",
-              "N": "hoài hương",
-              "KD": "hoai huong",
-              "Init": "hh"
-            },
-            {
-              "Name": "phường hoài tân",
-              "N": "hoài tân",
-              "KD": "hoai tan",
-              "Init": "ht"
-            },
-            {
-              "Name": "xã hoài hải",
-              "N": "hoài hải",
-              "KD": "hoai hai",
-              "Init": "hh"
-            },
-            {
-              "Name": "phường hoài xuân",
-              "N": "hoài xuân",
-              "KD": "hoai xuan",
-              "Init": "hx"
-            },
-            {
-              "Name": "xã hoài mỹ",
-              "N": "hoài mỹ",
-              "KD": "hoai my",
-              "Init": "hm"
-            },
-            {
-              "Name": "phường hoài đức",
-              "N": "hoài đức",
-              "KD": "hoai duc",
-              "Init": "hd"
-            }
-          ]
+  {
+    "Name": "phường bồng sơn",
+    "N": "bồng sơn",
+    "KD": "bong son",
+    "Init": "bs"
+  },
+  {
+    "Name": "phường hoài nhơn",
+    "N": "hoài nhơn",
+    "KD": "hoai nhon",
+    "Init": "hn"
+  },
+  {
+    "Name": "phường tam quan",
+    "N": "tam quan",
+    "KD": "tam quan",
+    "Init": "tq"
+  },
+  {
+    "Name": "phường hoài nhơn đông",
+    "N": "hoài nhơn đông",
+    "KD": "hoai nhon dong",
+    "Init": "hnd"
+  },
+  {
+    "Name": "phường hoài nhơn tây",
+    "N": "hoài nhơn tây",
+    "KD": "hoai nhon tay",
+    "Init": "hnt"
+  },
+  {
+    "Name": "phường hoài nhơn nam",
+    "N": "hoài nhơn nam",
+    "KD": "hoai nhon nam",
+    "Init": "hnn"
+  },
+  {
+    "Name": "phường hoài nhơn bắc",
+    "N": "hoài nhơn bắc",
+    "KD": "hoai nhon bac",
+    "Init": "hnb"
+  }
+]
