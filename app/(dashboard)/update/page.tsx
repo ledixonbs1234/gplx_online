@@ -521,8 +521,8 @@ export default function DirectUpdatePage() {
                             .join(' ');
 
                           const displayAddress = formattedPrefix 
-                            ? `${formattedPrefix}, ${capitalizedWard}, TX. Hoài Nhơn, Bình Định`
-                            : `${capitalizedWard}, TX. Hoài Nhơn, Bình Định`;
+                            ? `${formattedPrefix}, ${capitalizedWard}, Tỉnh Gia Lai`
+                            : `${capitalizedWard}, Tỉnh Gia Lai`;
 
                           return (
                             <div

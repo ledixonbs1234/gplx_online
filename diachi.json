@@ -1,5 +1,107 @@
 [
   {
+    "Name": "phường trần phú",
+    "N": "trần phú",
+    "KD": "tran phu",
+    "Init": "tp"
+  },
+  {
+    "Name": "phường thị nại",
+    "N": "thị nại",
+    "KD": "thi nai",
+    "Init": "tn"
+  },
+  {
+    "Name": "phường bùi thị xuân",
+    "N": "bùi thị xuân",
+    "KD": "bui thi xuan",
+    "Init": "btx"
+  },
+  {
+    "Name": "phường đống đa",
+    "N": "đống đa",
+    "KD": "dong da",
+    "Init": "dd"
+  },
+  {
+    "Name": "phường ghềnh ráng",
+    "N": "ghềnh ráng",
+    "KD": "gheng rang",
+    "Init": "gr"
+  },
+  {
+    "Name": "phường hải cảng",
+    "N": "hải cảng",
+    "KD": "hai cang",
+    "Init": "hc"
+  },
+  {
+    "Name": "phường ngô mây",
+    "N": "ngô mây",
+    "KD": "ngo may",
+    "Init": "nm"
+  },
+  {
+    "Name": "phường nguyễn văn cừ",
+    "N": "nguyễn văn cừ",
+    "KD": "nguyen van cu",
+    "Init": "nvc"
+  },
+  {
+    "Name": "phường nhơn bình",
+    "N": "nhơn bình",
+    "KD": "nhon binh",
+    "Init": "nb"
+  },
+  {
+    "Name": "phường nhơn phú",
+    "N": "nhơn phú",
+    "KD": "nhon phu",
+    "Init": "np"
+  },
+  {
+    "Name": "phường quang trung",
+    "N": "quang trung",
+    "KD": "quang trung",
+    "Init": "qt"
+  },
+  {
+    "Name": "phường trần quang diệu",
+    "N": "trần quang diệu",
+    "KD": "tran quang dieu",
+    "Init": "tqd"
+  },
+  {
+    "Name": "xã nhơn châu",
+    "N": "nhơn châu",
+    "KD": "nhon chau",
+    "Init": "nc"
+  },
+  {
+    "Name": "xã nhơn hải",
+    "N": "nhơn hải",
+    "KD": "nhon hai",
+    "Init": "nh"
+  },
+  {
+    "Name": "xã nhơn hội",
+    "N": "nhơn hội",
+    "KD": "nhon hoi",
+    "Init": "nh"
+  },
+  {
+    "Name": "xã nhơn lý",
+    "N": "nhơn lý",
+    "KD": "nhon ly",
+    "Init": "nl"
+  },
+  {
+    "Name": "xã phước mỹ",
+    "N": "phước mỹ",
+    "KD": "phuoc my",
+    "Init": "pm"
+  },
+  {
     "Name": "phường bồng sơn",
     "N": "bồng sơn",
     "KD": "bong son",
@@ -40,5 +142,725 @@
     "N": "hoài nhơn bắc",
     "KD": "hoai nhon bac",
     "Init": "hnb"
+  },
+  {
+    "Name": "phường bình định",
+    "N": "bình định",
+    "KD": "binh dinh",
+    "Init": "bd"
+  },
+  {
+    "Name": "phường đập đá",
+    "N": "đập đá",
+    "KD": "dap da",
+    "Init": "dd"
+  },
+  {
+    "Name": "phường nhơn hòa",
+    "N": "nhơn hòa",
+    "KD": "nhon hoa",
+    "Init": "nh"
+  },
+  {
+    "Name": "phường nhơn hưng",
+    "N": "nhơn hưng",
+    "KD": "nhon hung",
+    "Init": "nh"
+  },
+  {
+    "Name": "phường nhơn thành",
+    "N": "nhơn thành",
+    "KD": "nhon thanh",
+    "Init": "nt"
+  },
+  {
+    "Name": "xã nhơn an",
+    "N": "nhơn an",
+    "KD": "nhon an",
+    "Init": "na"
+  },
+  {
+    "Name": "xã nhơn hạnh",
+    "N": "nhơn hạnh",
+    "KD": "nhon hanh",
+    "Init": "nh"
+  },
+  {
+    "Name": "xã nhơn hậu",
+    "N": "nhơn hậu",
+    "KD": "nhon hau",
+    "Init": "nh"
+  },
+  {
+    "Name": "xã nhơn khánh",
+    "N": "nhơn khánh",
+    "KD": "nhon khanh",
+    "Init": "nk"
+  },
+  {
+    "Name": "xã nhơn lộc",
+    "N": "nhơn lộc",
+    "KD": "nhon loc",
+    "Init": "nl"
+  },
+  {
+    "Name": "xã nhơn mỹ",
+    "N": "nhơn mỹ",
+    "KD": "nhon my",
+    "Init": "nm"
+  },
+  {
+    "Name": "xã nhơn phong",
+    "N": "nhơn phong",
+    "KD": "nhon phong",
+    "Init": "np"
+  },
+  {
+    "Name": "xã nhơn phúc",
+    "N": "nhơn phúc",
+    "KD": "nhon phuc",
+    "Init": "np"
+  },
+  {
+    "Name": "xã nhơn tân",
+    "N": "nhơn tân",
+    "KD": "nhon tan",
+    "Init": "nt"
+  },
+  {
+    "Name": "xã nhơn thọ",
+    "N": "nhơn thọ",
+    "KD": "nhon tho",
+    "Init": "nt"
+  },
+  {
+    "Name": "thị trấn cát khánh",
+    "N": "cát khánh",
+    "KD": "cat khanh",
+    "Init": "ck"
+  },
+  {
+    "Name": "thị trấn cát tiến",
+    "N": "cát tiến",
+    "KD": "cat tien",
+    "Init": "ct"
+  },
+  {
+    "Name": "thị trấn ngô mây",
+    "N": "ngô mây",
+    "KD": "ngo may",
+    "Init": "nm"
+  },
+  {
+    "Name": "xã cát chánh",
+    "N": "cát chánh",
+    "KD": "cat chanh",
+    "Init": "cc"
+  },
+  {
+    "Name": "xã cát hải",
+    "N": "cát hải",
+    "KD": "cat hai",
+    "Init": "ch"
+  },
+  {
+    "Name": "xã cát hanh",
+    "N": "cát hanh",
+    "KD": "cat hanh",
+    "Init": "ch"
+  },
+  {
+    "Name": "xã cát hiệp",
+    "N": "cát hiệp",
+    "KD": "cat hiep",
+    "Init": "ch"
+  },
+  {
+    "Name": "xã cát hưng",
+    "N": "cát hưng",
+    "KD": "cat hung",
+    "Init": "ch"
+  },
+  {
+    "Name": "xã cát lâm",
+    "N": "cát lâm",
+    "KD": "cat lam",
+    "Init": "cl"
+  },
+  {
+    "Name": "xã cát minh",
+    "N": "cát minh",
+    "KD": "cat minh",
+    "Init": "cm"
+  },
+  {
+    "Name": "xã cát nhơn",
+    "N": "cát nhơn",
+    "KD": "cat nhon",
+    "Init": "cn"
+  },
+  {
+    "Name": "xã cát sơn",
+    "N": "cát sơn",
+    "KD": "cat son",
+    "Init": "cs"
+  },
+  {
+    "Name": "xã cát tài",
+    "N": "cát tài",
+    "KD": "cat tai",
+    "Init": "ct"
+  },
+  {
+    "Name": "xã cát tân",
+    "N": "cát tân",
+    "KD": "cat tan",
+    "Init": "ct"
+  },
+  {
+    "Name": "xã cát thành",
+    "N": "cát thành",
+    "KD": "cat thanh",
+    "Init": "ct"
+  },
+  {
+    "Name": "xã cát thắng",
+    "N": "cát thắng",
+    "KD": "cat thang",
+    "Init": "ct"
+  },
+  {
+    "Name": "xã cát trình",
+    "N": "cát trình",
+    "KD": "cat trinh",
+    "Init": "ct"
+  },
+  {
+    "Name": "xã cát tường",
+    "N": "cát tường",
+    "KD": "cat tuong",
+    "Init": "ct"
+  },
+  {
+    "Name": "thị trấn diêu trì",
+    "N": "diêu trì",
+    "KD": "dieu tri",
+    "Init": "dt"
+  },
+  {
+    "Name": "thị trấn tuy phước",
+    "N": "tuy phước",
+    "KD": "tuy phuoc",
+    "Init": "tp"
+  },
+  {
+    "Name": "xã phước an",
+    "N": "phước an",
+    "KD": "phuoc an",
+    "Init": "pa"
+  },
+  {
+    "Name": "xã phước hiệp",
+    "N": "phước hiệp",
+    "KD": "phuoc hiep",
+    "Init": "ph"
+  },
+  {
+    "Name": "xã phước hòa",
+    "N": "phước hòa",
+    "KD": "phuoc hoa",
+    "Init": "ph"
+  },
+  {
+    "Name": "xã phước hưng",
+    "N": "phước hưng",
+    "KD": "phuoc hung",
+    "Init": "ph"
+  },
+  {
+    "Name": "xã phước lộc",
+    "N": "phước lộc",
+    "KD": "phuoc loc",
+    "Init": "pl"
+  },
+  {
+    "Name": "xã phước nghĩa",
+    "N": "phước nghĩa",
+    "KD": "phuoc nghia",
+    "Init": "pn"
+  },
+  {
+    "Name": "xã phước quang",
+    "N": "phước quang",
+    "KD": "phuoc quang",
+    "Init": "pq"
+  },
+  {
+    "Name": "xã phước sơn",
+    "N": "phước sơn",
+    "KD": "phuoc son",
+    "Init": "ps"
+  },
+  {
+    "Name": "xã phước thành",
+    "N": "phước thành",
+    "KD": "phuoc thanh",
+    "Init": "pt"
+  },
+  {
+    "Name": "xã phước thắng",
+    "N": "phước thắng",
+    "KD": "phuoc thang",
+    "Init": "pt"
+  },
+  {
+    "Name": "xã phước thuận",
+    "N": "phước thuận",
+    "KD": "phuoc thuan",
+    "Init": "pt"
+  },
+  {
+    "Name": "thị trấn bình dương",
+    "N": "bình dương",
+    "KD": "binh duong",
+    "Init": "bd"
+  },
+  {
+    "Name": "thị trấn phù mỹ",
+    "N": "phù mỹ",
+    "KD": "phu my",
+    "Init": "pm"
+  },
+  {
+    "Name": "xã mỹ an",
+    "N": "mỹ an",
+    "KD": "my an",
+    "Init": "ma"
+  },
+  {
+    "Name": "xã mỹ cát",
+    "N": "mỹ cát",
+    "KD": "my cat",
+    "Init": "mc"
+  },
+  {
+    "Name": "xã mỹ chánh",
+    "N": "mỹ chánh",
+    "KD": "my chanh",
+    "Init": "mc"
+  },
+  {
+    "Name": "xã mỹ chánh tây",
+    "N": "mỹ chánh tây",
+    "KD": "my chanh tay",
+    "Init": "mct"
+  },
+  {
+    "Name": "xã mỹ châu",
+    "N": "mỹ châu",
+    "KD": "my chau",
+    "Init": "mc"
+  },
+  {
+    "Name": "xã mỹ đức",
+    "N": "mỹ đức",
+    "KD": "my duc",
+    "Init": "md"
+  },
+  {
+    "Name": "xã mỹ hiệp",
+    "N": "mỹ hiệp",
+    "KD": "my hiep",
+    "Init": "mh"
+  },
+  {
+    "Name": "xã mỹ hòa",
+    "N": "mỹ hòa",
+    "KD": "my hoa",
+    "Init": "mh"
+  },
+  {
+    "Name": "xã mỹ lộc",
+    "N": "mỹ lộc",
+    "KD": "my loc",
+    "Init": "ml"
+  },
+  {
+    "Name": "xã mỹ lợi",
+    "N": "mỹ lợi",
+    "KD": "my loi",
+    "Init": "ml"
+  },
+  {
+    "Name": "xã mỹ phong",
+    "N": "mỹ phong",
+    "KD": "my phong",
+    "Init": "mp"
+  },
+  {
+    "Name": "xã mỹ quang",
+    "N": "mỹ quang",
+    "KD": "my quang",
+    "Init": "mq"
+  },
+  {
+    "Name": "xã mỹ tài",
+    "N": "mỹ tài",
+    "KD": "my tai",
+    "Init": "mt"
+  },
+  {
+    "Name": "xã mỹ thành",
+    "N": "mỹ thành",
+    "KD": "my thanh",
+    "Init": "mt"
+  },
+  {
+    "Name": "xã mỹ thắng",
+    "N": "mỹ thắng",
+    "KD": "my thang",
+    "Init": "mt"
+  },
+  {
+    "Name": "xã mỹ thọ",
+    "N": "mỹ thọ",
+    "KD": "my tho",
+    "Init": "mt"
+  },
+  {
+    "Name": "xã mỹ trinh",
+    "N": "mỹ trinh",
+    "KD": "my trinh",
+    "Init": "mt"
+  },
+  {
+    "Name": "thị trấn phú phong",
+    "N": "phú phong",
+    "KD": "phu phong",
+    "Init": "pp"
+  },
+  {
+    "Name": "xã bình hòa",
+    "N": "bình hòa",
+    "KD": "binh hoa",
+    "Init": "bh"
+  },
+  {
+    "Name": "xã bình nghi",
+    "N": "bình nghi",
+    "KD": "binh nghi",
+    "Init": "bn"
+  },
+  {
+    "Name": "xã bình tân",
+    "N": "bình tân",
+    "KD": "binh tan",
+    "Init": "bt"
+  },
+  {
+    "Name": "xã bình thành",
+    "N": "bình thành",
+    "KD": "binh thanh",
+    "Init": "bt"
+  },
+  {
+    "Name": "xã bình tường",
+    "N": "bình tường",
+    "KD": "binh tuong",
+    "Init": "bt"
+  },
+  {
+    "Name": "xã tây an",
+    "N": "tây an",
+    "KD": "tay an",
+    "Init": "ta"
+  },
+  {
+    "Name": "xã tây bình",
+    "N": "tây bình",
+    "KD": "tay binh",
+    "Init": "tb"
+  },
+  {
+    "Name": "xã tây giang",
+    "N": "tây giang",
+    "KD": "tay giang",
+    "Init": "tg"
+  },
+  {
+    "Name": "xã tây phú",
+    "N": "tây phú",
+    "KD": "tay phu",
+    "Init": "tp"
+  },
+  {
+    "Name": "xã tây thuận",
+    "N": "tây thuận",
+    "KD": "tay thuan",
+    "Init": "tt"
+  },
+  {
+    "Name": "xã tây vinh",
+    "N": "tây vinh",
+    "KD": "tay vinh",
+    "Init": "tv"
+  },
+  {
+    "Name": "xã tây xuân",
+    "N": "tây xuân",
+    "KD": "tay xuan",
+    "Init": "tx"
+  },
+  {
+    "Name": "xã vĩnh an",
+    "N": "vĩnh an",
+    "KD": "vinh an",
+    "Init": "va"
+  },
+  {
+    "Name": "thị trấn tăng bạt hổ",
+    "N": "tăng bạt hổ",
+    "KD": "tang bat ho",
+    "Init": "tbh"
+  },
+  {
+    "Name": "xã ân đức",
+    "N": "ân đức",
+    "KD": "an duc",
+    "Init": "ad"
+  },
+  {
+    "Name": "xã ân hảo đông",
+    "N": "ân hảo đông",
+    "KD": "an hao dong",
+    "Init": "ahd"
+  },
+  {
+    "Name": "xã ân hảo tây",
+    "N": "ân hảo tây",
+    "KD": "an hao tay",
+    "Init": "aht"
+  },
+  {
+    "Name": "xã ân hữu",
+    "N": "ân hữu",
+    "KD": "an huu",
+    "Init": "ah"
+  },
+  {
+    "Name": "xã ân mỹ",
+    "N": "ân mỹ",
+    "KD": "an my",
+    "Init": "am"
+  },
+  {
+    "Name": "xã ân nghĩa",
+    "N": "ân nghĩa",
+    "KD": "an nghia",
+    "Init": "an"
+  },
+  {
+    "Name": "xã ân phong",
+    "N": "ân phong",
+    "KD": "an phong",
+    "Init": "ap"
+  },
+  {
+    "Name": "xã ân sơn",
+    "N": "ân sơn",
+    "KD": "an son",
+    "Init": "as"
+  },
+  {
+    "Name": "xã ân thạnh",
+    "N": "ân thạnh",
+    "KD": "an thanh",
+    "Init": "at"
+  },
+  {
+    "Name": "xã ân tín",
+    "N": "ân tín",
+    "KD": "an tin",
+    "Init": "at"
+  },
+  {
+    "Name": "xã ân tường đông",
+    "N": "ân tường đông",
+    "KD": "an tuong dong",
+    "Init": "atd"
+  },
+  {
+    "Name": "xã ân tường tây",
+    "N": "ân tường tây",
+    "KD": "an tuong tay",
+    "Init": "att"
+  },
+  {
+    "Name": "xã bok tới",
+    "N": "bok tới",
+    "KD": "bok toi",
+    "Init": "bt"
+  },
+  {
+    "Name": "xã đắk mang",
+    "N": "đắk mang",
+    "KD": "dak mang",
+    "Init": "dm"
+  },
+  {
+    "Name": "thị trấn an lão",
+    "N": "an lão",
+    "KD": "an lao",
+    "Init": "al"
+  },
+  {
+    "Name": "xã an dũng",
+    "N": "an dũng",
+    "KD": "an dung",
+    "Init": "ad"
+  },
+  {
+    "Name": "xã an hòa",
+    "N": "an hòa",
+    "KD": "an hoa",
+    "Init": "ah"
+  },
+  {
+    "Name": "xã an hưng",
+    "N": "an hưng",
+    "KD": "an hung",
+    "Init": "ah"
+  },
+  {
+    "Name": "xã an nghĩa",
+    "N": "an nghĩa",
+    "KD": "an nghia",
+    "Init": "an"
+  },
+  {
+    "Name": "xã an quang",
+    "N": "an quang",
+    "KD": "an quang",
+    "Init": "aq"
+  },
+  {
+    "Name": "xã an tân",
+    "N": "an tân",
+    "KD": "an tan",
+    "Init": "at"
+  },
+  {
+    "Name": "xã an toàn",
+    "N": "an toàn",
+    "KD": "an toan",
+    "Init": "at"
+  },
+  {
+    "Name": "xã an trung",
+    "N": "an trung",
+    "KD": "an trung",
+    "Init": "at"
+  },
+  {
+    "Name": "xã an vinh",
+    "N": "an vinh",
+    "KD": "an vinh",
+    "Init": "av"
+  },
+  {
+    "Name": "thị trấn vĩnh thạnh",
+    "N": "vĩnh thạnh",
+    "KD": "vinh thanh",
+    "Init": "vt"
+  },
+  {
+    "Name": "xã vĩnh hảo",
+    "N": "vĩnh hảo",
+    "KD": "vinh hao",
+    "Init": "vh"
+  },
+  {
+    "Name": "xã vĩnh hiệp",
+    "N": "vĩnh hiệp",
+    "KD": "vinh hiep",
+    "Init": "vh"
+  },
+  {
+    "Name": "xã vĩnh hòa",
+    "N": "vĩnh hòa",
+    "KD": "vinh hoa",
+    "Init": "vh"
+  },
+  {
+    "Name": "xã vĩnh kim",
+    "N": "vĩnh kim",
+    "KD": "vinh kim",
+    "Init": "vk"
+  },
+  {
+    "Name": "xã vĩnh quang",
+    "N": "vĩnh quang",
+    "KD": "vinh quang",
+    "Init": "vq"
+  },
+  {
+    "Name": "xã vĩnh sơn",
+    "N": "vĩnh sơn",
+    "KD": "vinh son",
+    "Init": "vs"
+  },
+  {
+    "Name": "xã vĩnh thịnh",
+    "N": "vĩnh thịnh",
+    "KD": "vinh thinh",
+    "Init": "vt"
+  },
+  {
+    "Name": "xã vĩnh thuận",
+    "N": "vĩnh thuận",
+    "KD": "vinh thuan",
+    "Init": "vt"
+  },
+  {
+    "Name": "thị trấn vân canh",
+    "N": "vân canh",
+    "KD": "van canh",
+    "Init": "vc"
+  },
+  {
+    "Name": "xã canh hiển",
+    "N": "canh hiển",
+    "KD": "canh hien",
+    "Init": "ch"
+  },
+  {
+    "Name": "xã canh hiệp",
+    "N": "canh hiệp",
+    "KD": "canh hiep",
+    "Init": "ch"
+  },
+  {
+    "Name": "xã canh hòa",
+    "N": "canh hòa",
+    "KD": "canh hoa",
+    "Init": "ch"
+  },
+  {
+    "Name": "xã canh liên",
+    "N": "canh liên",
+    "KD": "canh lien",
+    "Init": "cl"
+  },
+  {
+    "Name": "xã canh thuận",
+    "N": "canh thuận",
+    "KD": "canh thuan",
+    "Init": "ct"
+  },
+  {
+    "Name": "xã canh vinh",
+    "N": "canh vinh",
+    "KD": "canh vinh",
+    "Init": "cv"
   }
 ]
