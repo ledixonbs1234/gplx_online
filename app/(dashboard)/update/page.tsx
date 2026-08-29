@@ -134,7 +134,7 @@ export default function DirectUpdatePage() {
     }
   };
 
-  // Thuật toán tách lọc địa chỉ thông minh
+  // Thuật toán tách lọc địa chỉ thông minh và sắp xếp theo độ ưu tiên chính xác nhất
   const handleAddressChange = (val: string) => {
     setMDiaChi(val);
     if (!val.trim()) {
@@ -143,7 +143,7 @@ export default function DirectUpdatePage() {
       return;
     }
 
-    const userInput = val.toLowerCase();
+    const userInput = val.toLowerCase().trim();
     
     const normalizeStr = (str: string) => {
       return str
@@ -155,56 +155,142 @@ export default function DirectUpdatePage() {
     };
     const normalizedInput = normalizeStr(userInput);
 
+    const lastCommaIdx = userInput.lastIndexOf(',');
+    const lastSegment = (lastCommaIdx !== -1 ? userInput.substring(lastCommaIdx + 1) : userInput).trim();
+    const normLastSegment = normalizeStr(lastSegment);
+
     const matchedList: any[] = [];
 
     diachiData.forEach((item: any) => {
-      const initLower = item.Init.toLowerCase();
-      const nLower = item.N.toLowerCase();
-      const kdLower = item.KD.toLowerCase();
-      const nameLower = item.Name.toLowerCase();
+      const initLower = (item.Init || '').toLowerCase().trim();
+      const nLower = (item.N || '').toLowerCase().trim();
+      const kdLower = (item.KD || '').toLowerCase().trim();
+      const nameLower = (item.Name || '').toLowerCase().trim();
 
+      let score = 0;
+      let matchType: 'init' | 'n' | 'kd' | 'name' | 'prefix' | 'prefix_kd' | 'prefix_init' | 'contains' | 'contains_kd' = 'contains';
       let matchedTextInInput = '';
-      let matchType: 'init' | 'n' | 'kd' | 'name' | 'direct' = 'direct';
+      let matchLength = 0;
+      let isEndOfInput = false;
 
-      // 1. Kiểm tra phím tắt (Init) ở cuối chuỗi nhập (ví dụ: "25 trần hưng đạo bs", "25 trần hưng đạo, tqb")
-      const initRegex = new RegExp(`(?:\\s|,|^)${initLower}$`, 'i');
+      // 1. Kiểm tra phím tắt (Init) ở cuối chuỗi hoặc toàn bộ chuỗi
+      const escapedInit = initLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const initRegex = new RegExp(`(?:^|[\\s,._\\-\\/])(${escapedInit})$`, 'i');
       const initMatch = userInput.match(initRegex);
 
       if (initMatch) {
-        matchedTextInInput = initMatch[0];
+        const matchedWord = initMatch[1];
+        const matchStartIdx = userInput.lastIndexOf(matchedWord);
+        matchedTextInInput = val.substring(matchStartIdx);
         matchType = 'init';
+        matchLength = matchedWord.length;
+        isEndOfInput = true;
+        score = 700 + initLower.length * 20;
+        if (userInput === initLower) {
+          score += 500; // Khớp chính xác hoàn toàn từ viết tắt
+        }
       }
-      // 2. Kiểm tra tên có dấu (N) ở cuối hoặc trong chuỗi nhập
-      else if (userInput.includes(nLower)) {
-        const idx = userInput.lastIndexOf(nLower);
-        matchedTextInInput = val.substring(idx);
-        matchType = 'n';
-      } 
-      // 3. Kiểm tra tên không dấu (KD) trong chuỗi nhập
-      else if (normalizedInput.includes(kdLower)) {
+
+      // 2. Khớp Tên có dấu (N) hoặc Tên đầy đủ (Name) trong chuỗi
+      if (score === 0) {
+        const foundN = userInput.includes(nLower);
+        const foundName = userInput.includes(nameLower);
+
+        if (foundN || foundName) {
+          const targetStr = foundN ? nLower : nameLower;
+          const idx = userInput.lastIndexOf(targetStr);
+          matchedTextInInput = val.substring(idx);
+          matchType = foundN ? 'n' : 'name';
+          matchLength = targetStr.length;
+          
+          const tail = userInput.substring(idx + targetStr.length).replace(/^[,._\-\s]+|[,._\-\s]+$/g, '');
+          isEndOfInput = tail.length === 0;
+
+          score = 400 + matchLength * 20;
+          if (isEndOfInput) {
+            score += 350; // Khớp ở vị trí kết thúc địa chỉ
+          }
+          if (userInput === targetStr || userInput === nameLower) {
+            score += 500; // Khớp chính xác tuyệt đối tên địa phương
+          }
+        }
+      }
+
+      // 3. Khớp Tên không dấu (KD) trong chuỗi
+      if (score === 0 && normalizedInput.includes(kdLower)) {
         const idx = normalizedInput.lastIndexOf(kdLower);
         matchedTextInInput = val.substring(idx);
         matchType = 'kd';
-      } 
-      // 4. Kiểm tra tên đầy đủ (Name) trong chuỗi nhập
-      else if (userInput.includes(nameLower)) {
-        const idx = userInput.lastIndexOf(nameLower);
-        matchedTextInInput = val.substring(idx);
-        matchType = 'name';
-      }
-      // 5. Nếu người dùng chỉ gõ đơn thuần tên phường xã để tìm kiếm trực tiếp
-      else if (nameLower.includes(userInput) || nLower.includes(userInput) || kdLower.includes(normalizedInput) || initLower.startsWith(userInput)) {
-        matchedTextInInput = val;
-        matchType = 'direct';
+        matchLength = kdLower.length;
+        
+        const tail = normalizedInput.substring(idx + kdLower.length).replace(/^[,._\-\s]+|[,._\-\s]+$/g, '');
+        isEndOfInput = tail.length === 0;
+
+        score = 300 + matchLength * 20;
+        if (isEndOfInput) {
+          score += 300;
+        }
+        if (normalizedInput === kdLower) {
+          score += 450;
+        }
       }
 
-      if (matchedTextInInput) {
+      // 4. Tìm kiếm xuôi / tiền tố / tìm kiếm đoạn cuối (khi đang gõ dở tên xã/phường)
+      if (score === 0) {
+        if (lastSegment) {
+          if (nLower.startsWith(lastSegment) || nameLower.startsWith(lastSegment)) {
+            const idx = userInput.lastIndexOf(lastSegment);
+            matchedTextInInput = val.substring(idx);
+            matchType = 'prefix';
+            matchLength = lastSegment.length;
+            score = 250 + (100 - nLower.length) + matchLength * 10;
+          } else if (kdLower.startsWith(normLastSegment)) {
+            const idx = normalizedInput.lastIndexOf(normLastSegment);
+            matchedTextInInput = val.substring(idx);
+            matchType = 'prefix_kd';
+            matchLength = normLastSegment.length;
+            score = 200 + (100 - kdLower.length) + matchLength * 10;
+          } else if (initLower.startsWith(lastSegment)) {
+            const idx = userInput.lastIndexOf(lastSegment);
+            matchedTextInInput = val.substring(idx);
+            matchType = 'prefix_init';
+            matchLength = lastSegment.length;
+            score = 180 + matchLength * 10;
+          }
+        }
+
+        if (score === 0) {
+          if (nameLower.includes(userInput) || nLower.includes(userInput)) {
+            matchedTextInInput = val;
+            matchType = 'contains';
+            matchLength = userInput.length;
+            score = 100 + (100 - nLower.length);
+          } else if (kdLower.includes(normalizedInput)) {
+            matchedTextInInput = val;
+            matchType = 'contains_kd';
+            matchLength = normalizedInput.length;
+            score = 80 + (100 - kdLower.length);
+          }
+        }
+      }
+
+      if (score > 0) {
         matchedList.push({
           item,
           matchedTextInInput,
-          matchType
+          matchType,
+          score,
+          matchLength,
+          isEndOfInput
         });
       }
+    });
+
+    // Sắp xếp các gợi ý theo độ ưu tiên: Điểm cao nhất -> Độ dài chuỗi khớp lớn nhất -> Tên ngắn nhất
+    matchedList.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.matchLength !== a.matchLength) return b.matchLength - a.matchLength;
+      return a.item.Name.length - b.item.Name.length;
     });
 
     setSuggestions(matchedList.slice(0, 5));
@@ -217,23 +303,24 @@ export default function DirectUpdatePage() {
     const { item, matchedTextInInput, matchType } = suggestionData;
     
     let prefix = mDiaChi;
-    if (matchType !== 'direct') {
-      const idx = mDiaChi.toLowerCase().lastIndexOf(matchedTextInInput.toLowerCase());
-      if (idx !== -1) {
-        prefix = mDiaChi.substring(0, idx);
-      }
+    const idx = matchedTextInInput ? mDiaChi.toLowerCase().lastIndexOf(matchedTextInInput.toLowerCase()) : -1;
+    
+    if (idx !== -1) {
+      prefix = mDiaChi.substring(0, idx);
+    } else if (matchType === 'contains' || matchType === 'contains_kd') {
+      prefix = '';
     }
     
     // Loại bỏ khoảng trắng và dấu phẩy thừa ở cuối số nhà/tên đường
-    prefix = prefix.trim().replace(/[,-\s]+$/, '');
+    prefix = prefix.trim().replace(/[,._\-\s]+$/, '');
     
     // Viết hoa chữ cái đầu của các từ trong tên đường (vd: "25 trần hưng đạo" -> "25 Trần Hưng Đạo")
-    const formattedPrefix = prefix.split(' ').map((word: string) => {
+    const formattedPrefix = prefix.split(' ').filter(Boolean).map((word: string) => {
       if (/^\d/.test(word)) return word; // Giữ nguyên số nhà dạng số
       return word.charAt(0).toUpperCase() + word.slice(1);
     }).join(' ');
 
-    const capitalizedWard = item.Name.split(' ')
+    const capitalizedWard = item.Name.split(' ').filter(Boolean)
       .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
 
@@ -504,19 +591,19 @@ export default function DirectUpdatePage() {
                           
                           // Tạo chuỗi xem trước địa chỉ chuẩn hóa sẽ hiển thị
                           let prefix = mDiaChi;
-                          if (matchType !== 'direct') {
-                            const idx = mDiaChi.toLowerCase().lastIndexOf(matchedTextInInput.toLowerCase());
-                            if (idx !== -1) {
-                              prefix = mDiaChi.substring(0, idx);
-                            }
+                          const idx = matchedTextInInput ? mDiaChi.toLowerCase().lastIndexOf(matchedTextInInput.toLowerCase()) : -1;
+                          if (idx !== -1) {
+                            prefix = mDiaChi.substring(0, idx);
+                          } else if (matchType === 'contains' || matchType === 'contains_kd') {
+                            prefix = '';
                           }
-                          prefix = prefix.trim().replace(/[,-\s]+$/, '');
-                          const formattedPrefix = prefix.split(' ').map((word: string) => {
+                          prefix = prefix.trim().replace(/[,._\-\s]+$/, '');
+                          const formattedPrefix = prefix.split(' ').filter(Boolean).map((word: string) => {
                             if (/^\d/.test(word)) return word;
                             return word.charAt(0).toUpperCase() + word.slice(1);
                           }).join(' ');
 
-                          const capitalizedWard = item.Name.split(' ')
+                          const capitalizedWard = item.Name.split(' ').filter(Boolean)
                             .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
                             .join(' ');
 
@@ -526,7 +613,7 @@ export default function DirectUpdatePage() {
 
                           return (
                             <div
-                              key={item.Init}
+                              key={`${item.Name}_${item.Init}_${index}`}
                               onMouseDown={() => handleSelectSuggestion(suggestionData)}
                               className={`px-4 py-3 text-lg font-medium cursor-pointer transition-colors flex items-center justify-between ${
                                 index === activeSuggestionIndex
